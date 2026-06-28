@@ -1,0 +1,9 @@
+{
+  "name": "common-base",
+  "version": "1.0.0",
+  "description": "Common base utilities for SoftwareAction",
+  "main": "./Index.ets",
+  "author": "",
+  "license": "",
+  "dependencies": {}
+}

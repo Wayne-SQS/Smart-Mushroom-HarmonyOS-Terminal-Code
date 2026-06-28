@@ -1,0 +1,16 @@
+/node_modules
+/oh_modules
+/local.properties
+/.idea
+**/build
+/.hvigor
+.cxx
+/.clangd
+/.clang-format
+/.clang-tidy
+**/.test
+/.appanalyzer
+
+# 凭据安全：真实 IoT 配置文件不提交，仅提交模板
+**/IotConfig.ets
+!**/IotConfig.example.ets

@@ -1,0 +1,11 @@
+{
+  "name": "features-core",
+  "version": "1.0.0",
+  "description": "Core feature layer for SoftwareAction IoT services",
+  "main": "./Index.ets",
+  "author": "",
+  "license": "",
+  "dependencies": {
+    "common-base": "file:../../common/base"
+  }
+}

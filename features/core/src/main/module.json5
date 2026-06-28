@@ -1,0 +1,21 @@
+{
+  "module": {
+    "name": "features_core",
+    "type": "har",
+    "description": "Core feature layer for SoftwareAction IoT services",
+    "deviceTypes": [
+      "phone",
+      "tablet",
+      "2in1",
+      "car",
+      "wearable",
+      "tv"
+    ],
+    "dependencies": [
+      {
+        "bundleName": "com.example.softwareaction",
+        "moduleName": "common_base"
+      }
+    ]
+  }
+}
