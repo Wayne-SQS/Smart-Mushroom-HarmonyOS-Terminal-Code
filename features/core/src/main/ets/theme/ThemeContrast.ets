@@ -27,8 +27,8 @@ export const CONTRAST_THEME: ThemeTokens = {
   // 背景
   bgPage: '#F3F3F3',
   bgCard: '#FFFFFF',
-  bgCardLight: '#F8F8F8',
-  bgOverlay: '#999999',
+  bgCardLight: '#FAFAFA',
+  bgOverlay: '#73000000',
   bgTabBar: '#FFFFFF',
 
   // Header 渐变
@@ -63,19 +63,19 @@ export const CONTRAST_THEME: ThemeTokens = {
   radiusXl: 8,
   radiusFull: 9999,
 
-  // 阴影
-  shadowCardRadius: 0,
-  shadowCardColor: '#000000',
-  shadowCardOffsetY: 0,
+  // 阴影（极简：细边框为主，辅以极淡投影增强层次）
+  shadowCardRadius: 2,
+  shadowCardColor: '#14000000',
+  shadowCardOffsetY: 1,
   shadowHoverRadius: 0,
-  shadowHoverColor: '#000000',
+  shadowHoverColor: '#00000000',
   shadowHoverOffsetY: 0,
-  shadowHeaderRadius: 0,
-  shadowHeaderColor: '#000000',
-  shadowHeaderOffsetY: 0,
-  shadowFloatRadius: 4,
-  shadowFloatColor: '#DDDDDD',
-  shadowFloatOffsetY: 2,
+  shadowHeaderRadius: 4,
+  shadowHeaderColor: '#33000000',
+  shadowHeaderOffsetY: 2,
+  shadowFloatRadius: 8,
+  shadowFloatColor: '#26000000',
+  shadowFloatOffsetY: 4,
 
   // 毛玻璃
   blurAmount: 0,

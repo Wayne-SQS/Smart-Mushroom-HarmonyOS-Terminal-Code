@@ -3,14 +3,17 @@ import { ChartPoint, ChartUtils } from './ChartComponent';
 /**
  * 柱状图组件
  *
- * 单系列柱状图，Canvas 自绘
- * 用法：BarChartComponent({ data: points, barColor: '#4CAF50', height: 200 })
+ * 单系列柱状图，Canvas 自绘。所有颜色通过 @Prop 传入，支持主题切换。
+ * 用法：BarChartComponent({ data: points, barColor: '#4CAF50', chartHeight: 200 })
  */
 @Component
 export struct BarChartComponent {
   @Prop data: ChartPoint[];
   @Prop barColor: string = '#4CAF50';
   @Prop chartHeight: number = 200;
+  @Prop labelColor: string = '#333333';
+  @Prop axisColor: string = '#999999';
+  @Prop baselineColor: string = '#E0E0E0';
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
 
@@ -42,7 +45,7 @@ export struct BarChartComponent {
     ctx.clearRect(0, 0, w, h);
 
     // 底部基线
-    ctx.strokeStyle = '#E0E0E0';
+    ctx.strokeStyle = this.baselineColor;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(padding, h - padding);
@@ -60,13 +63,13 @@ export struct BarChartComponent {
       ctx.fillRect(x, y, barW, barH);
 
       // 数值标签
-      ctx.fillStyle = '#333333';
+      ctx.fillStyle = this.labelColor;
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(this.formatValue(point.value), x + barW / 2, y - 4);
 
       // X 轴 label
-      ctx.fillStyle = '#999999';
+      ctx.fillStyle = this.axisColor;
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(point.label, x + barW / 2, h - padding + 14);

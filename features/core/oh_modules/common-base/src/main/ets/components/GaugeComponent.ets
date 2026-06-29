@@ -3,13 +3,17 @@ import { GaugeConfig } from './ChartComponent';
 /**
  * 仪表盘组件
  *
- * 半圆仪表盘，Canvas 自绘
- * 用法：GaugeComponent({ config: gaugeConfig, size: 160 })
+ * 半圆仪表盘，Canvas 自绘。所有颜色通过 @Prop 传入，支持主题切换。
+ * 用法：GaugeComponent({ config: gaugeConfig, chartSize: 160 })
  */
 @Component
 export struct GaugeComponent {
   @Prop config: GaugeConfig;
   @Prop chartSize: number = 160;
+  @Prop bgArcColor: string = '#E0E0E0';
+  @Prop textValueColor: string = '#1A1A1A';
+  @Prop textLabelColor: string = '#666666';
+  @Prop textAuxColor: string = '#999999';
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
 
@@ -39,7 +43,7 @@ export struct GaugeComponent {
     const endAngle = Math.PI * 2;
 
     // 背景弧
-    ctx.strokeStyle = '#E0E0E0';
+    ctx.strokeStyle = this.bgArcColor;
     ctx.lineWidth = 12;
     ctx.lineCap = 'round';
     ctx.beginPath();
@@ -58,23 +62,23 @@ export struct GaugeComponent {
     ctx.stroke();
 
     // 中心数值
-    ctx.fillStyle = '#1A1A1A';
+    ctx.fillStyle = this.textValueColor;
     ctx.font = 'bold 24px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(this.formatValue(this.config.value), cx, cy - 8);
 
     // 单位
-    ctx.fillStyle = '#666666';
+    ctx.fillStyle = this.textLabelColor;
     ctx.font = '12px sans-serif';
     ctx.fillText(this.config.unit, cx, cy + 8);
 
     // 顶部 label
-    ctx.fillStyle = '#666666';
+    ctx.fillStyle = this.textLabelColor;
     ctx.font = '12px sans-serif';
     ctx.fillText(this.config.label, cx, 16);
 
     // min / max
-    ctx.fillStyle = '#999999';
+    ctx.fillStyle = this.textAuxColor;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText(this.config.min.toString(), cx - radius, cy + 16);
