@@ -1,9 +1,17 @@
+import { MapViewComponent, MapMarker } from 'common-base';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeTokens } from '../theme/ThemeTokens';
 
 /**
- * 地图监控页面 - 主题驱动
- * 当前为占位地图，后续集成 HMS Map Kit
+ * 地图监控页面 - HMS Map Kit + 降级双模式
+ *
+ * 坐标系统：
+ *   - 使用 WGS84 真实经纬度（武汉及周边区域）
+ *   - Map Kit 模式：直接渲染到真实地图
+ *   - 降级模式：经纬度投影到 Canvas 画布百分比坐标
+ *
+ * 当 Map Kit 系统能力可用时自动使用真实地图；
+ * 否则降级为自定义 Canvas 地图（无需 AGC 配置即可运行）。
  */
 
 interface GreenhouseLocation {
@@ -15,29 +23,53 @@ interface GreenhouseLocation {
   devices: number;
   temp: number;
   humidity: number;
-  x: number;
-  y: number;
+  /** 纬度（WGS84） */
+  lat: number;
+  /** 经度（WGS84） */
+  lng: number;
 }
 
 @Component
 export struct MapPage {
   @StorageLink('themeName') themeName: string = 'frosted';
 
+  /** 大棚位置数据（武汉周边真实经纬度） */
   @State greenhouses: GreenhouseLocation[] = [
-    { id: '1', name: '1号蘑菇大棚', status: '运行正常', sensors: 12, alerts: 0, devices: 8, temp: 22.5, humidity: 85, x: 25, y: 35 },
-    { id: '2', name: '2号蘑菇大棚', status: '运行正常', sensors: 10, alerts: 0, devices: 6, temp: 21.8, humidity: 82, x: 55, y: 20 },
-    { id: '3', name: '3号蘑菇大棚', status: 'CO₂偏高', sensors: 11, alerts: 2, devices: 7, temp: 24.1, humidity: 88, x: 40, y: 60 },
-    { id: '4', name: '育种室', status: '运行正常', sensors: 6, alerts: 0, devices: 4, temp: 25.0, humidity: 70, x: 70, y: 50 },
-    { id: '5', name: '5号实验棚', status: '温度偏低', sensors: 8, alerts: 1, devices: 5, temp: 14.2, humidity: 78, x: 20, y: 75 },
-    { id: '6', name: '6号香菇棚', status: '运行正常', sensors: 9, alerts: 0, devices: 6, temp: 18.5, humidity: 80, x: 80, y: 75 },
-    { id: '7', name: '7号金针菇棚', status: '运行正常', sensors: 7, alerts: 0, devices: 5, temp: 10.2, humidity: 90, x: 60, y: 80 },
-    { id: '8', name: '菌种储存室', status: '离线', sensors: 4, alerts: 3, devices: 3, temp: 0, humidity: 0, x: 35, y: 15 }
+    { id: '1', name: '1号蘑菇大棚', status: '运行正常', sensors: 12, alerts: 0, devices: 8, temp: 22.5, humidity: 85, lat: 30.52, lng: 114.32 },
+    { id: '2', name: '2号蘑菇大棚', status: '运行正常', sensors: 10, alerts: 0, devices: 6, temp: 21.8, humidity: 82, lat: 30.55, lng: 114.28 },
+    { id: '3', name: '3号蘑菇大棚', status: 'CO₂偏高',   sensors: 11, alerts: 2, devices: 7, temp: 24.1, humidity: 88, lat: 30.48, lng: 114.35 },
+    { id: '4', name: '育种室',       status: '运行正常', sensors: 6,  alerts: 0, devices: 4, temp: 25.0, humidity: 70, lat: 30.53, lng: 114.38 },
+    { id: '5', name: '5号实验棚',   status: '温度偏低', sensors: 8,  alerts: 1, devices: 5, temp: 14.2, humidity: 78, lat: 30.47, lng: 114.30 },
+    { id: '6', name: '6号香菇棚',   status: '运行正常', sensors: 9,  alerts: 0, devices: 6, temp: 18.5, humidity: 80, lat: 30.56, lng: 114.40 },
+    { id: '7', name: '7号金针菇棚', status: '运行正常', sensors: 7,  alerts: 0, devices: 5, temp: 10.2, humidity: 90, lat: 30.50, lng: 114.42 },
+    { id: '8', name: '菌种储存室',   status: '离线',     sensors: 4,  alerts: 3, devices: 3, temp: 0,    humidity: 0,  lat: 30.49, lng: 114.26 }
   ];
   @State selectedId: string = '1';
   @State searchKeyword: string = '';
 
+  /** 地图中心（所有大棚的几何中心） */
+  private mapCenterLat: number = 30.51;
+  private mapCenterLng: number = 114.34;
+
   t(): ThemeTokens {
     return ThemeManager.getInstance().getTokens();
+  }
+
+  /** 将 GreenhouseLocation 转为 MapMarker */
+  private toMapMarkers(): MapMarker[] {
+    const result: MapMarker[] = [];
+    for (let i = 0; i < this.greenhouses.length; i++) {
+      const g = this.greenhouses[i];
+      result.push({
+        id: g.id,
+        lat: g.lat,
+        lng: g.lng,
+        label: g.name,
+        statusColor: this.getStatusColor(g.status),
+        selected: g.id === this.selectedId
+      });
+    }
+    return result;
   }
 
   build() {
@@ -69,6 +101,7 @@ export struct MapPage {
       }
       .width('100%')
 
+      // 搜索栏
       Row() {
         Text('🔍').fontSize(this.t().fontMd)
         TextInput({ text: this.searchKeyword, placeholder: '搜索大棚名称' })
@@ -137,95 +170,34 @@ export struct MapPage {
     })
   }
 
+  // ==================== 地图区域（Map Kit 自动切换） ====================
   @Builder
   MapSection() {
     Stack({ alignContent: Alignment.Bottom }) {
-      Stack() {
-        // 模拟地图背景（固定自然绿色调，不随主题变化）
-        Column()
-          .width('100%')
-          .height('100%')
-          .linearGradient({
-            angle: 180,
-            colors: [['#E8F5E9', 0.0], ['#C8E6C9', 0.5], ['#A5D6A7', 1.0]]
-          })
+      MapViewComponent({
+        markers: this.toMapMarkers(),
+        centerLat: this.mapCenterLat,
+        centerLng: this.mapCenterLng,
+        zoomLevel: 13,
+        mapHeight: 320,
+        onMarkerClick: (id: string) => {
+          this.selectedId = id;
+        }
+      })
+        .width('100%')
+        .height(320)
+        .borderRadius(this.t().radiusLg)
+        .clip(true)
+        .backgroundColor(this.t().bgCardLight)
 
-        // 网格横线
-        Column() {
-          ForEach([0, 1, 2, 3, 4, 5], () => {
-            Row().width('100%').height(1).backgroundColor('#FFFFFF80')
-          })
-        }.width('100%').height('100%').justifyContent(FlexAlign.SpaceEvenly)
-
-        // 网格竖线
-        Row() {
-          ForEach([0, 1, 2, 3, 4, 5, 6], () => {
-            Column().width(1).height('100%').backgroundColor('#FFFFFF60')
-          })
-        }.width('100%').height('100%').justifyContent(FlexAlign.SpaceEvenly)
-
-        // 大棚标记
-        ForEach(this.getFilteredGreenhouses(), (item: GreenhouseLocation) => {
-          this.Marker(item)
-        }, (item: GreenhouseLocation) => item.id)
-
-        // 比例尺
-        Row() {
-          Column().width(2).height(8).backgroundColor(this.t().textSub)
-          Column().width(56).height(2).backgroundColor(this.t().textSub)
-          Column().width(2).height(8).backgroundColor(this.t().textSub)
-          Text(' 50m').fontSize(this.t().fontXs).fontColor(this.t().textSub)
-        }.alignItems(VerticalAlign.Center).position({ x: 12, y: 12 })
-
-        // 底部提示
-        Row() {
-          Text('📍 后续集成 HMS Map Kit')
-            .fontSize(this.t().fontXs).fontColor(this.t().textSub)
-            .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-            .backgroundColor(this.t().bgCard)
-            .borderRadius(this.t().radiusSm)
-        }.position({ x: '50%', y: 12 }).translate({ x: '-50%' })
-      }
-      .width('100%').height('100%')
-
+      // 底部详情卡片
       this.DetailCard(this.getSelectedGreenhouse())
     }
-    .width('100%').height(320)
+    .width('100%')
     .margin({ top: 10, left: 12, right: 12 })
-    .borderRadius(this.t().radiusLg)
-    .clip(true)
-    .backgroundColor(this.t().bgCardLight)
   }
 
-  @Builder
-  Marker(item: GreenhouseLocation) {
-    Stack() {
-      // 选中态光环
-      Circle({ width: 30, height: 30 })
-        .fill(this.t().bgCardLight)
-        .opacity(item.id === this.selectedId ? 1 : 0)
-        .scale({ x: item.id === this.selectedId ? 1.4 : 1, y: item.id === this.selectedId ? 1.4 : 1 })
-        .animation({ duration: 300, curve: Curve.EaseOut })
-
-      Circle({ width: 14, height: 14 })
-        .fill(this.getStatusColor(item.status))
-        .border({ width: 2, color: this.t().textWhite })
-        .scale({ x: item.id === this.selectedId ? 1.2 : 1, y: item.id === this.selectedId ? 1.2 : 1 })
-        .animation({ duration: 200, curve: Curve.EaseOut })
-
-      if (item.id === this.selectedId) {
-        Text(item.name)
-          .fontSize(this.t().fontXs).fontColor(this.t().textOnPrimary)
-          .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-          .backgroundColor(this.t().primary)
-          .borderRadius(this.t().radiusSm)
-          .position({ x: '50%', y: -22 }).translate({ x: '-50%' })
-      }
-    }
-    .position({ x: `${item.x}%`, y: `${item.y}%` })
-    .onClick(() => { this.selectedId = item.id; })
-  }
-
+  // ==================== 选中大棚详情卡片 ====================
   @Builder
   DetailCard(item: GreenhouseLocation) {
     if (item.id !== '') {
@@ -245,7 +217,7 @@ export struct MapPage {
             .fontSize(this.t().fontSm).fontColor(this.t().textOnPrimary)
             .padding({ left: 10, right: 10, top: 6, bottom: 6 })
             .backgroundColor(this.t().primary).borderRadius(this.t().radiusSm)
-            .onClick(() => { /* AppRouter 接入点 */ })
+            .onClick(() => { /* TODO: AppRouter 接入大棚详情页 */ })
         }.width('100%').alignItems(VerticalAlign.Top)
 
         Row() {
@@ -296,6 +268,7 @@ export struct MapPage {
     }
   }
 
+  // ==================== 大棚列表 ====================
   @Builder
   GreenhouseList() {
     Column() {
@@ -345,6 +318,10 @@ export struct MapPage {
           .fontSize(this.t().fontLg).fontColor(item.alerts > 0 ? this.t().warning : this.t().textSub).fontWeight(FontWeight.Bold)
         Text('告警').fontSize(this.t().fontXs).fontColor(this.t().textSub)
       }.alignItems(HorizontalAlign.Center)
+
+      // 经纬度坐标展示
+      Text(`📍`)
+        .fontSize(this.t().fontXs).fontColor(this.t().textHint)
     }
     .width('100%').padding(14).alignItems(VerticalAlign.Center)
     .backgroundColor(item.id === this.selectedId ? this.t().bgCardLight : this.t().bgCard)
@@ -361,7 +338,7 @@ export struct MapPage {
     .onClick(() => { this.selectedId = item.id; })
   }
 
-  // ============ 私有方法 ============
+  // ============ 辅助方法 ============
 
   private getFilteredGreenhouses(): GreenhouseLocation[] {
     if (this.searchKeyword.length === 0) { return this.greenhouses; }
@@ -400,6 +377,6 @@ export struct MapPage {
     for (let i = 0; i < this.greenhouses.length; i++) {
       if (this.greenhouses[i].id === this.selectedId) { return this.greenhouses[i]; }
     }
-    return { id: '', name: '', status: '', sensors: 0, alerts: 0, devices: 0, temp: 0, humidity: 0, x: 0, y: 0 };
+    return { id: '', name: '', status: '', sensors: 0, alerts: 0, devices: 0, temp: 0, humidity: 0, lat: 0, lng: 0 };
   }
 }

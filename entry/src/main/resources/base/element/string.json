@@ -2,15 +2,19 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "module description"
+      "value": "蘑菇大棚 IoT 管理系统"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "蘑菇大棚 IoT 管理系统"
     },
     {
       "name": "EntryAbility_label",
-      "value": "label"
+      "value": "蘑菇大棚"
+    },
+    {
+      "name": "location_permission_reason",
+      "value": "用于在地图上显示大棚位置和您的当前位置"
     }
   ]
 }
