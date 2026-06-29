@@ -8,7 +8,46 @@ SoftwareAction is a **蘑菇大棚 IoT 管理系统** (Mushroom Greenhouse IoT M
 
 **Key reference document:** `docs/harmony-kb.md` — HarmonyOS development knowledge base covering kit APIs, Huawei Cloud IoT integration, and project conventions.
 
-**⚠️ CREDENTIALS:** `EntryAbility.ets` hardcodes real Huawei Cloud IoTDA credentials (`IOT_CONFIG`). Never commit these to a public repository. Move to encrypted config or backend proxy before production.
+**⚠️ CREDENTIALS:** `entry/src/main/ets/entryability/IotConfig.ets` contains real Huawei Cloud IoTDA credentials (`IOT_CONFIG`). This file is excluded via `.gitignore` (`**/IotConfig.ets`) but currently exists in the working tree. Never commit this file. The template at `IotConfig.example.ets` (NOT gitignored) is the safe file to commit — new developers copy it to `IotConfig.ets` and fill in their credentials.
+
+### `docs/` 目录规则
+
+`docs/` 下的文件是**设计文档和知识库，不是可执行代码**：
+
+- **只读优先**：除非用户明确要求修改，否则不要改动 `docs/` 下的任何文件
+- **不构建验证**：文档中的代码片段是示意性的，不要尝试编译或运行。不要对 `docs/` 触发 `hvigorw` 构建
+- **内容权威性**：`docs/harmony-kb.md` 是 HarmonyOS 开发的知识来源，文档中的 API 用法优先于模型训练数据中的记忆
+
+### Startup Sequence
+
+```
+EntryAbility.onCreate()
+  ├── context.setColorMode(NOT_SET)     // follow system
+  ├── IotService.getInstance().init(IOT_CONFIG)  // singleton, loads IAM creds
+  └── hilog init log
+
+EntryAbility.onWindowStageCreate()
+  └── windowStage.loadContent('pages/Index')
+
+Index.aboutToAppear()
+  ├── AppStorage.setOrCreate('navPathStack', AppRouter.getStack())
+  └── AppStorage.setOrCreate('currentBreakpoint', BreakpointConstants.SM)
+
+Index.build()
+  ├── onAreaChange → recompute breakpoint → write AppStorage
+  ├── Narrow (XS/SM): Tabs(barPosition=End) with TabContent inline
+  └── Wide (MD/LG/XL): SideNavBar + Navigation(mode=Auto) with NavDestination builder
+```
+
+### IotConfig Security Pattern
+
+The `.gitignore` uses a negated pattern to protect credentials:
+```
+**/IotConfig.ets          # ignored — real credentials, never commit
+!**/IotConfig.example.ets # NOT ignored — template, safe to commit
+```
+
+`IotConfig.ets` imports `IotAppConfig` from `features-core` and exports `IOT_CONFIG`. `EntryAbility.ets` imports it as `import { IOT_CONFIG } from './IotConfig'`. Always verify `IotConfig.ets` is not staged before committing.
 
 ## Build System & Commands
 
@@ -62,7 +101,7 @@ common/base (HAR)  →  features/core (HAR)  →  entry (HAP)
 
 | Layer | Package | Key directories |
 |-------|---------|-----------------|
-| Public | `common-base` | `constants/`, `utils/`, `components/` (charts) |
+| Public | `common-base` | `constants/` (Breakpoint, Style, SensorType), `utils/` (Logger, Capability), `components/` (BarChart, LineChart, Gauge, base ChartComponent) |
 | Feature | `features-core` | `pages/`, `viewmodel/`, `model/`, `service/` (IoT) |
 | Product | `entry` | `entryability/`, `pages/` (Index, AppRouter), `src/test/` |
 
@@ -81,8 +120,22 @@ The app uses `Navigation` + `NavPathStack` + `NavDestination`:
 - `entry/pages/Index.ets` owns the `Navigation` component with a `NavPathStack`
 - `AppRouter` is a singleton that holds the shared `NavPathStack`, accessible from any module
 - `NavPathStack` is stored in `AppStorage` under key `'navPathStack'` so `features-core` pages can call `AppRouter.push('AlertPage')` etc.
-- Sub-pages (AlertPage, GrowthPage, RecipePage, SettingsPage) are registered in `main_pages.json` and rendered via `@Builder PageDestination` in Index.ets
+- **`main_pages.json` only registers `pages/Index`** — all other pages (AlertPage, GrowthPage, RecipePage, etc.) are imported from `features-core` module and rendered via builder patterns:
+  - **Sub-pages** (AlertPage, GrowthPage, RecipePage): rendered via `@Builder PageDestination(name)` in Index.ets, reached via `AppRouter.push('AlertPage')` etc.
+  - **Tab pages** (DashboardPage, DevicePage, MapPage, ProfilePage): rendered inline in `TabContent` (narrow) or `Column` (wide)
 - Main tabs: 首页 (Dashboard), 设备 (Device), 地图 (Map), 我的 (Profile)
+- SettingsPage is mentioned in routing plans but **does not exist yet** (see `docs/后续开发计划.md`)
+
+### Index Responsive Layout (Dual-Mode)
+
+The `Index.ets` entry page implements a breakpoint-driven dual-mode architecture:
+
+| Mode | Breakpoints | Layout |
+|------|-------------|--------|
+| **Narrow** | XS, SM | `Tabs(barPosition=End)` — bottom tab bar, full TabContent pages |
+| **Wide** | MD, LG, XL | `SideNavBar` (96vp left rail) + `Navigation(mode=Auto)` — Navigation auto-chooses Stack or Split |
+
+The wide mode uses `Navigation` for the content area, supporting `NavPathStack` push/pop for sub-pages. The narrow mode Tabs do NOT use Navigation — sub-page pushes from within tab pages still work because `AppRouter` shares the same `NavPathStack` across both modes.
 
 ### IoT Service Layer (`features/core/src/main/ets/service/`)
 
@@ -184,7 +237,7 @@ scope: common / feature / product / ui / api
 - `entry/build/`
 - `entry/.preview/`
 - `oh_modules/`
-- Device credentials / API keys (currently hardcoded in `EntryAbility.ets` as `IOT_CONFIG`)
+- `**/IotConfig.ets` — real credentials (see IotConfig Security Pattern above). Template `IotConfig.example.ets` IS safe to commit.
 
 ## File Naming
 | Type | Pattern |
@@ -237,4 +290,36 @@ IoTDA Cloud → IotService.queryDeviceShadow() → getDeviceProperties('smartRoo
   → DashboardViewModel.applyProperties() → sensors array with calculated status
   → Page UI binding
 ```
+
+### Chart Component System (`common/base/src/main/ets/components/`)
+
+The common-base layer provides a reusable chart component hierarchy:
+
+| Component | Purpose |
+|-----------|---------|
+| `ChartComponent` | Base class — exports `ChartPoint`, `ChartSeries`, `GaugeConfig` interfaces + `ChartUtils` |
+| `BarChartComponent` | Bar/column charts (used for 24h sensor trends) |
+| `LineChartComponent` | Line charts (used for 7-day trends) |
+| `GaugeComponent` | Circular gauge (used for sensor value-at-a-glance) |
+
+All chart components take data via typed interfaces (no `any`), support theme-aware colors, and are Canvas-based for performance.
+
+### Build Profile Strict Mode
+
+`build-profile.json5` enables two important strict checks:
+```json5
+"strictMode": {
+  "caseSensitiveCheck": true,     // imports must match file case exactly
+  "useNormalizedOHMUrl": true     // enforces standard OHPM URL format
+}
+```
+These catch case-sensitivity bugs early — HarmonyOS is case-sensitive but Windows is not, so without this check, code that builds locally can fail on CI/device.
+
+## Project Documentation (`docs/`)
+
+| File | Content |
+|------|---------|
+| `harmony-kb.md` | **Primary reference** — HarmonyOS kit APIs, Huawei Cloud IoT integration, coding patterns, official doc links |
+| `后续开发计划.md` | Development roadmap — Phase I (UI ✅ done), Phase II (IoT data ✅ done), Phase III (navigation/charts ✅ done), Phases IV–VI (Map Kit, theming, multi-device, testing — in progress/planned) |
+| `美化.md` | UI theming plan — dual-theme system (frosted glass `theme_frosted` + high contrast `theme_contrast`) with `ThemeManager` singleton, backdropBlur, animation system. **Theme system is planned but not yet implemented** — current code uses `StyleConstants` directly. |
 

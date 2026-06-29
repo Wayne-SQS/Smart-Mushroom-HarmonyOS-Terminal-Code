@@ -1,18 +1,16 @@
-import { StyleConstants, BreakpointConstants, AdaptiveUtils } from 'common-base';
+import { BreakpointConstants, AdaptiveUtils } from 'common-base';
 import { DeviceItem } from '../model/GreenhouseModel';
+import { ThemeManager } from '../theme/ThemeManager';
+import { ThemeTokens } from '../theme/ThemeTokens';
 
 /**
- * 设备管理页面 - 多端适配
- *
- * 响应式：
- * - 设备列表 GridRow 多列：xs/sm 1列 / md 2列 / lg 3列 / xl 4列
- * - XL 屏内容限宽居中
- * - 卡片间距随断点变化
+ * 设备管理页面 - 多端适配（主题驱动）
  */
 
 @Component
 export struct DevicePage {
   @StorageLink('currentBreakpoint') currentBreakpoint: string = BreakpointConstants.SM;
+  @StorageLink('themeName') themeName: string = 'frosted';
 
   @State devices: DeviceItem[] = [
     { id: '1', name: '温度传感器-A区', type: '温度', status: 1, lastUpdate: '10秒前', location: 'A区东侧' },
@@ -29,6 +27,10 @@ export struct DevicePage {
   @State onlineCount: number = 7;
   @State offlineCount: number = 1;
 
+  t(): ThemeTokens {
+    return ThemeManager.getInstance().getTokens();
+  }
+
   build() {
     if (this.shouldLimitWidth()) {
       Row() {
@@ -42,14 +44,14 @@ export struct DevicePage {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(StyleConstants.BG_PAGE)
+      .backgroundColor(this.t().bgPage)
     } else {
       Column() {
         this.ContentBody()
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(StyleConstants.BG_PAGE)
+      .backgroundColor(this.t().bgPage)
     }
   }
 
@@ -60,12 +62,10 @@ export struct DevicePage {
     this.DeviceList()
   }
 
-  /** 是否需要内容限宽（大屏） */
   private shouldLimitWidth(): boolean {
     return AdaptiveUtils.getMaxContentWidth(this.currentBreakpoint) > 0;
   }
 
-  /** 内容区宽度：XL 屏限宽，其他全宽 */
   private getContentWidth(): string {
     const max = AdaptiveUtils.getMaxContentWidth(this.currentBreakpoint);
     return max > 0 ? max.toString() : '100%';
@@ -79,13 +79,12 @@ export struct DevicePage {
     return AdaptiveUtils.getCardGap(this.currentBreakpoint);
   }
 
-  /** 设备列表 GridCol span：12 / 列数 */
   private getDeviceSpan(): number {
     const cols = AdaptiveUtils.getDeviceColumns(this.currentBreakpoint);
     return Math.floor(12 / cols);
   }
 
-  // ==================== 顶部 Header ====================
+  // ==================== Header ====================
   @Builder
   HeaderSection() {
     Stack({ alignContent: Alignment.TopStart }) {
@@ -94,7 +93,7 @@ export struct DevicePage {
         .height(140)
         .linearGradient({
           angle: 135,
-          colors: [[StyleConstants.PRIMARY_DARK, 0.0], [StyleConstants.PRIMARY, 0.6], ['#388E3C', 1.0]]
+          colors: [[this.t().headerGradientTop, 0.0], [this.t().headerGradientBottom, 1.0]]
         })
 
       Column() {
@@ -103,22 +102,22 @@ export struct DevicePage {
           Column() {
             Text('设备管理')
               .fontSize(AdaptiveUtils.getTitleFontSize(this.currentBreakpoint))
-              .fontColor(StyleConstants.TEXT_WHITE)
+              .fontColor(this.t().textWhite)
               .fontWeight(FontWeight.Bold)
             Text(`共 ${this.totalCount} 台设备 · 在线 ${this.onlineCount}`)
-              .fontSize(StyleConstants.FONT_SM)
-              .fontColor(StyleConstants.TEXT_WHITE_SUB)
+              .fontSize(this.t().fontSm)
+              .fontColor(this.t().textWhiteSub)
               .margin({ top: 4 })
           }
           .alignItems(HorizontalAlign.Start)
           .layoutWeight(1)
 
           Text('+ 添加')
-            .fontSize(StyleConstants.FONT_MD)
-            .fontColor(StyleConstants.TEXT_WHITE)
+            .fontSize(this.t().fontMd)
+            .fontColor(this.t().textWhite)
             .padding({ left: 14, right: 14, top: 8, bottom: 8 })
-            .backgroundColor('#FFFFFF20')
-            .borderRadius(StyleConstants.RADIUS_SM)
+            .backgroundColor(this.t().bgCardLight)
+            .borderRadius(this.t().radiusSm)
         }
         .width('100%')
         .padding({ left: this.getPagePadding(), right: this.getPagePadding() })
@@ -133,27 +132,27 @@ export struct DevicePage {
   @Builder
   StatsBar() {
     Row() {
-      this.StatMetric('📡', this.totalCount.toString(), '设备总数', StyleConstants.PRIMARY)
-      Divider().vertical(true).height(36).color(StyleConstants.BORDER_LIGHT)
-      this.StatMetric('🟢', this.onlineCount.toString(), '在线', StyleConstants.SUCCESS)
-      Divider().vertical(true).height(36).color(StyleConstants.BORDER_LIGHT)
-      this.StatMetric('🔴', this.offlineCount.toString(), '离线', StyleConstants.DANGER)
+      this.StatMetric('📡', this.totalCount.toString(), '设备总数', this.t().primary)
+      Divider().vertical(true).height(36).color(this.t().borderLight)
+      this.StatMetric('🟢', this.onlineCount.toString(), '在线', this.t().success)
+      Divider().vertical(true).height(36).color(this.t().borderLight)
+      this.StatMetric('🔴', this.offlineCount.toString(), '离线', this.t().danger)
     }
     .width('100%')
     .padding({ top: 18, bottom: 18 })
-    .backgroundColor(StyleConstants.BG_CARD)
-    .borderRadius(StyleConstants.RADIUS_LG)
+    .backgroundColor(this.t().bgCard)
+    .borderRadius(this.t().radiusLg)
     .shadow({
-      radius: StyleConstants.SHADOW_CARD_RADIUS,
-      color: StyleConstants.SHADOW_CARD_COLOR,
+      radius: this.t().shadowCardRadius,
+      color: this.t().shadowCardColor,
       offsetX: 0,
-      offsetY: StyleConstants.SHADOW_CARD_OFFSETY
+      offsetY: this.t().shadowCardOffsetY
     })
     .margin({ top: -20, left: this.getPagePadding(), right: this.getPagePadding() })
   }
 
   @Builder
-  StatMetric(icon: string, value: string, label: string, color: string) {
+  StatMetric(icon: string, value: string, label: string, accentColor: string) {
     Column() {
       Text(icon)
         .fontSize(18)
@@ -161,22 +160,23 @@ export struct DevicePage {
         .height(36)
         .textAlign(TextAlign.Center)
         .borderRadius(18)
-        .backgroundColor(color + '18')
+        .backgroundColor(this.t().bgCardLight)
+      // 大字号走 AdaptiveUtils 断点自适应
       Text(value)
-        .fontSize(StyleConstants.FONT_XL)
-        .fontColor(color)
+        .fontSize(AdaptiveUtils.getOverviewFontSize(this.currentBreakpoint))
+        .fontColor(this.t().textTitle)
         .fontWeight(FontWeight.Bold)
         .margin({ top: 6 })
       Text(label)
-        .fontSize(StyleConstants.FONT_SM)
-        .fontColor(StyleConstants.TEXT_SUB)
+        .fontSize(this.t().fontSm)
+        .fontColor(this.t().textSub)
         .margin({ top: 2 })
     }
     .layoutWeight(1)
     .alignItems(HorizontalAlign.Center)
   }
 
-  // ==================== 设备列表（响应式多列） ====================
+  // ==================== 设备列表 ====================
   @Builder
   DeviceList() {
     Scroll() {
@@ -209,7 +209,6 @@ export struct DevicePage {
   DeviceCard(item: DeviceItem) {
     Column() {
       Row() {
-        // 设备图标
         Column() {
           Text(this.getDeviceIcon(item.type))
             .fontSize(28)
@@ -217,10 +216,9 @@ export struct DevicePage {
         .width(48)
         .height(48)
         .borderRadius(24)
-        .backgroundColor(this.getStatusColor(item.status) + '18')
+        .backgroundColor(this.t().bgCardLight)
         .justifyContent(FlexAlign.Center)
 
-        // 状态点
         Blank()
         Circle({ width: 8, height: 8 })
           .fill(this.getStatusColor(item.status))
@@ -228,26 +226,24 @@ export struct DevicePage {
       }
       .width('100%')
 
-      // 设备名
       Text(item.name)
-        .fontSize(StyleConstants.FONT_MD)
-        .fontColor(StyleConstants.TEXT_TITLE)
+        .fontSize(this.t().fontMd)
+        .fontColor(this.t().textTitle)
         .fontWeight(FontWeight.Medium)
         .margin({ top: 10 })
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-      // 类型 + 位置
       Row() {
         Text(item.type)
-          .fontSize(StyleConstants.FONT_XS)
-          .fontColor(StyleConstants.TEXT_SUB)
+          .fontSize(this.t().fontXs)
+          .fontColor(this.t().textSub)
           .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-          .backgroundColor(StyleConstants.BG_CARD_LIGHT)
+          .backgroundColor(this.t().bgCardLight)
           .borderRadius(4)
         Text(item.location)
-          .fontSize(StyleConstants.FONT_XS)
-          .fontColor(StyleConstants.TEXT_HINT)
+          .fontSize(this.t().fontXs)
+          .fontColor(this.t().textSub)
           .margin({ left: 8 })
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -256,48 +252,41 @@ export struct DevicePage {
       .width('100%')
       .margin({ top: 6 })
 
-      // 底部状态行
       Row() {
         Text(this.getStatusText(item.status))
-          .fontSize(StyleConstants.FONT_XS)
+          .fontSize(this.t().fontXs)
           .fontColor(this.getStatusColor(item.status))
         Blank()
         Text(item.lastUpdate)
-          .fontSize(StyleConstants.FONT_XS)
-          .fontColor(StyleConstants.TEXT_HINT)
+          .fontSize(this.t().fontXs)
+          .fontColor(this.t().textSub)
       }
       .width('100%')
       .margin({ top: 8 })
     }
     .width('100%')
     .padding(14)
-    .backgroundColor(StyleConstants.BG_CARD)
-    .borderRadius(StyleConstants.RADIUS_MD)
+    .backgroundColor(this.t().bgCard)
+    .backdropBlur(this.t().blurAmount)
+    .border({ width: 1, color: this.t().border })
+    .borderRadius(this.t().radiusMd)
     .shadow({
-      radius: 4,
-      color: '#0A000000',
+      radius: this.t().shadowCardRadius,
+      color: this.t().shadowCardColor,
       offsetX: 0,
-      offsetY: 1
+      offsetY: this.t().shadowCardOffsetY
     })
   }
 
   private getStatusColor(status: number): string {
-    if (status === 1) {
-      return StyleConstants.SUCCESS;
-    }
-    if (status === 2) {
-      return StyleConstants.DANGER;
-    }
-    return StyleConstants.TEXT_HINT;
+    if (status === 1) { return this.t().success; }
+    if (status === 2) { return this.t().danger; }
+    return this.t().textSub;
   }
 
   private getStatusText(status: number): string {
-    if (status === 1) {
-      return '● 在线';
-    }
-    if (status === 2) {
-      return '● 故障';
-    }
+    if (status === 1) { return '● 在线'; }
+    if (status === 2) { return '● 故障'; }
     return '● 离线';
   }
 

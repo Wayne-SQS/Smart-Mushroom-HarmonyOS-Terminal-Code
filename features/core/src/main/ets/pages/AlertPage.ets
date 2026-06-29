@@ -1,13 +1,10 @@
-import { StyleConstants, BreakpointConstants, AdaptiveUtils } from 'common-base';
+import { BreakpointConstants, AdaptiveUtils } from 'common-base';
 import { AlertItem } from '../model/GreenhouseModel';
+import { ThemeManager } from '../theme/ThemeManager';
+import { ThemeTokens } from '../theme/ThemeTokens';
 
 /**
- * 告警中心页面 - 多端适配
- *
- * 响应式：
- * - 告警列表 GridRow 多列：xs/sm 1列 / md 2列 / lg 2列 / xl 3列
- * - XL 屏内容限宽居中
- * - 统计条带图标美化
+ * 告警中心页面 - 多端适配（主题驱动）
  */
 
 interface AlertFilter {
@@ -18,6 +15,7 @@ interface AlertFilter {
 @Component
 export struct AlertPage {
   @StorageLink('currentBreakpoint') currentBreakpoint: string = BreakpointConstants.SM;
+  @StorageLink('themeName') themeName: string = 'frosted';
 
   @State alerts: AlertItem[] = [
     { id: '1', level: 1, message: 'CO₂浓度偏高(1200ppm)，建议通风', time: '2分钟前', device: 'CO2传感器-A区' },
@@ -35,6 +33,10 @@ export struct AlertPage {
     { id: 'danger', label: '危险' }
   ];
 
+  t(): ThemeTokens {
+    return ThemeManager.getInstance().getTokens();
+  }
+
   build() {
     if (this.shouldLimitWidth()) {
       Row() {
@@ -48,14 +50,14 @@ export struct AlertPage {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(StyleConstants.BG_PAGE)
+      .backgroundColor(this.t().bgPage)
     } else {
       Column() {
         this.ContentBody()
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(StyleConstants.BG_PAGE)
+      .backgroundColor(this.t().bgPage)
     }
   }
 
@@ -67,7 +69,6 @@ export struct AlertPage {
     this.AlertList()
   }
 
-  /** 是否需要内容限宽（大屏） */
   private shouldLimitWidth(): boolean {
     return AdaptiveUtils.getMaxContentWidth(this.currentBreakpoint) > 0;
   }
@@ -85,13 +86,12 @@ export struct AlertPage {
     return AdaptiveUtils.getCardGap(this.currentBreakpoint);
   }
 
-  /** 告警卡片 GridCol span：xs/sm 12 / md 6 / lg 6 / xl 4 */
   private getAlertSpan(): number {
     const cols = AdaptiveUtils.getCardColumns(this.currentBreakpoint);
     return Math.floor(12 / cols);
   }
 
-  // ==================== 顶部 Header ====================
+  // ==================== Header ====================
   @Builder
   HeaderSection() {
     Stack({ alignContent: Alignment.TopStart }) {
@@ -100,46 +100,42 @@ export struct AlertPage {
         .height(140)
         .linearGradient({
           angle: 135,
-          colors: [[StyleConstants.PRIMARY_DARK, 0.0], [StyleConstants.PRIMARY, 0.6], ['#388E3C', 1.0]]
+          colors: [[this.t().headerGradientTop, 0.0], [this.t().headerGradientBottom, 1.0]]
         })
 
       Row() {
         Column() {
           Text('告警中心')
             .fontSize(AdaptiveUtils.getTitleFontSize(this.currentBreakpoint))
-            .fontColor(StyleConstants.TEXT_WHITE)
+            .fontColor(this.t().textWhite)
             .fontWeight(FontWeight.Bold)
           Text(`未读 ${this.getUnreadCount()} · 危险 ${this.getDangerCount()}`)
-            .fontSize(StyleConstants.FONT_SM)
-            .fontColor(StyleConstants.TEXT_WHITE_SUB)
+            .fontSize(this.t().fontSm)
+            .fontColor(this.t().textWhiteSub)
             .margin({ top: 4 })
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
 
-        // 未读数徽章
         if (this.getUnreadCount() > 0) {
           Text(this.getUnreadCount().toString())
-            .fontSize(StyleConstants.FONT_SM)
-            .fontColor(StyleConstants.TEXT_WHITE)
-            .backgroundColor(StyleConstants.DANGER)
+            .fontSize(this.t().fontSm)
+            .fontColor(this.t().textOnDanger)
+            .backgroundColor(this.t().danger)
             .borderRadius(12)
             .padding({ left: 8, right: 8, top: 4, bottom: 4 })
             .margin({ right: 8 })
             .textAlign(TextAlign.Center)
-            .shadow({ radius: 4, color: StyleConstants.DANGER, offsetX: 0, offsetY: 0 })
+            .shadow({ radius: 4, color: this.t().danger, offsetX: 0, offsetY: 0 })
         }
 
-        // 全部已读按钮
         Text('全部已读')
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(StyleConstants.TEXT_WHITE)
+          .fontSize(this.t().fontSm)
+          .fontColor(this.t().textWhite)
           .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-          .backgroundColor('#FFFFFF20')
-          .borderRadius(StyleConstants.RADIUS_SM)
-          .onClick(() => {
-            this.markAllRead();
-          })
+          .backgroundColor(this.t().bgCardLight)
+          .borderRadius(this.t().radiusSm)
+          .onClick(() => { this.markAllRead(); })
       }
       .width('100%')
       .height(140)
@@ -153,27 +149,27 @@ export struct AlertPage {
   @Builder
   StatsBar() {
     Row() {
-      this.StatMetric('📊', this.alerts.length.toString(), '总告警数', StyleConstants.PRIMARY)
-      Divider().vertical(true).height(36).color(StyleConstants.BORDER_LIGHT)
-      this.StatMetric('🔴', this.getUnreadCount().toString(), '未读', StyleConstants.DANGER)
-      Divider().vertical(true).height(36).color(StyleConstants.BORDER_LIGHT)
-      this.StatMetric('⚠', this.getDangerCount().toString(), '危险', StyleConstants.WARNING)
+      this.StatMetric('📊', this.alerts.length.toString(), '总告警数', this.t().primary)
+      Divider().vertical(true).height(36).color(this.t().borderLight)
+      this.StatMetric('🔴', this.getUnreadCount().toString(), '未读', this.t().danger)
+      Divider().vertical(true).height(36).color(this.t().borderLight)
+      this.StatMetric('⚠', this.getDangerCount().toString(), '危险', this.t().warning)
     }
     .width('100%')
     .padding({ top: 18, bottom: 18 })
-    .backgroundColor(StyleConstants.BG_CARD)
-    .borderRadius(StyleConstants.RADIUS_LG)
+    .backgroundColor(this.t().bgCard)
+    .borderRadius(this.t().radiusLg)
     .shadow({
-      radius: StyleConstants.SHADOW_CARD_RADIUS,
-      color: StyleConstants.SHADOW_CARD_COLOR,
+      radius: this.t().shadowCardRadius,
+      color: this.t().shadowCardColor,
       offsetX: 0,
-      offsetY: StyleConstants.SHADOW_CARD_OFFSETY
+      offsetY: this.t().shadowCardOffsetY
     })
     .margin({ top: -20, left: this.getPagePadding(), right: this.getPagePadding() })
   }
 
   @Builder
-  StatMetric(icon: string, value: string, label: string, color: string) {
+  StatMetric(icon: string, value: string, label: string, accentColor: string) {
     Column() {
       Text(icon)
         .fontSize(18)
@@ -181,15 +177,15 @@ export struct AlertPage {
         .height(36)
         .textAlign(TextAlign.Center)
         .borderRadius(18)
-        .backgroundColor(color + '18')
+        .backgroundColor(this.t().bgCardLight)
       Text(value)
-        .fontSize(StyleConstants.FONT_XL)
-        .fontColor(color)
+        .fontSize(this.t().fontXl)
+        .fontColor(this.t().textTitle)
         .fontWeight(FontWeight.Bold)
         .margin({ top: 6 })
       Text(label)
-        .fontSize(StyleConstants.FONT_SM)
-        .fontColor(StyleConstants.TEXT_SUB)
+        .fontSize(this.t().fontSm)
+        .fontColor(this.t().textSub)
         .margin({ top: 2 })
     }
     .layoutWeight(1)
@@ -202,22 +198,20 @@ export struct AlertPage {
     Row() {
       ForEach(this.filters, (filter: AlertFilter) => {
         Text(filter.label)
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(this.currentFilter === filter.id ? StyleConstants.TEXT_WHITE : StyleConstants.TEXT_SUB)
-          .backgroundColor(this.currentFilter === filter.id ? StyleConstants.PRIMARY : StyleConstants.BG_CARD_LIGHT)
+          .fontSize(this.t().fontSm)
+          .fontColor(this.currentFilter === filter.id ? this.t().textOnPrimary : this.t().textSub)
+          .backgroundColor(this.currentFilter === filter.id ? this.t().primary : this.t().bgCardLight)
           .padding({ left: 16, right: 16, top: 6, bottom: 6 })
-          .borderRadius(StyleConstants.RADIUS_SM)
+          .borderRadius(this.t().radiusSm)
           .margin({ right: 8 })
-          .onClick(() => {
-            this.currentFilter = filter.id;
-          })
+          .onClick(() => { this.currentFilter = filter.id; })
       })
     }
     .width('100%')
     .padding({ left: this.getPagePadding(), right: this.getPagePadding(), top: 12 })
   }
 
-  // ==================== 告警列表（响应式多列） ====================
+  // ==================== 告警列表 ====================
   @Builder
   AlertList() {
     Scroll() {
@@ -249,15 +243,14 @@ export struct AlertPage {
     .scrollBar(BarState.Auto)
   }
 
-  // ==================== 空状态 ====================
   @Builder
   EmptyState() {
     Column() {
       Text('🌿')
         .fontSize(64)
       Text('暂无告警，大棚运行正常')
-        .fontSize(StyleConstants.FONT_MD)
-        .fontColor(StyleConstants.TEXT_HINT)
+        .fontSize(this.t().fontMd)
+        .fontColor(this.t().textSub)
         .margin({ top: 12 })
     }
     .width('100%')
@@ -265,51 +258,48 @@ export struct AlertPage {
     .alignItems(HorizontalAlign.Center)
   }
 
-  // ==================== 单条告警卡片 ====================
+  // ==================== 告警卡片（彩色左侧竖线） ====================
   @Builder
   AlertCard(item: AlertItem) {
     Row() {
-      // 等级色条
+      // 等级色条（装饰，不用做文字色）
       Column()
         .width(4)
-        .height('100%')
+        .height(64)
         .backgroundColor(this.getLevelColor(item.level))
         .borderRadius(2)
 
-      // 内容区
       Column() {
         Row() {
-          // 等级徽章
           Text(this.getLevelText(item.level))
-            .fontSize(StyleConstants.FONT_XS)
+            .fontSize(this.t().fontXs)
             .fontColor(this.getLevelColor(item.level))
             .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-            .backgroundColor(this.getLevelColor(item.level) + '20')
+            .backgroundColor(this.t().bgCardLight)
             .borderRadius(4)
 
           Blank()
 
-          // 状态徽章 + 未读红点
           if (this.isUnread(item.id)) {
             Row() {
               Circle({ width: 6, height: 6 })
-                .fill(StyleConstants.DANGER)
+                .fill(this.t().danger)
               Text('未读')
-                .fontSize(StyleConstants.FONT_XS)
-                .fontColor(StyleConstants.DANGER)
+                .fontSize(this.t().fontXs)
+                .fontColor(this.t().danger)
                 .margin({ left: 4 })
             }
           } else {
             Text('已读')
-              .fontSize(StyleConstants.FONT_XS)
-              .fontColor(StyleConstants.TEXT_HINT)
+              .fontSize(this.t().fontXs)
+              .fontColor(this.t().textSub)
           }
         }
         .width('100%')
 
         Text(item.message)
-          .fontSize(StyleConstants.FONT_MD)
-          .fontColor(StyleConstants.TEXT_TITLE)
+          .fontSize(this.t().fontMd)
+          .fontColor(this.t().textTitle)
           .fontWeight(FontWeight.Medium)
           .margin({ top: 8 })
           .maxLines(2)
@@ -317,14 +307,14 @@ export struct AlertPage {
 
         Row() {
           Text('📍 ' + item.device)
-            .fontSize(StyleConstants.FONT_XS)
-            .fontColor(StyleConstants.TEXT_SUB)
+            .fontSize(this.t().fontXs)
+            .fontColor(this.t().textSub)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .layoutWeight(1)
           Text(item.time)
-            .fontSize(StyleConstants.FONT_XS)
-            .fontColor(StyleConstants.TEXT_HINT)
+            .fontSize(this.t().fontXs)
+            .fontColor(this.t().textSub)
             .margin({ left: 8 })
         }
         .width('100%')
@@ -336,17 +326,17 @@ export struct AlertPage {
     }
     .width('100%')
     .padding(14)
-    .backgroundColor(StyleConstants.BG_CARD)
-    .borderRadius(StyleConstants.RADIUS_MD)
+    .backgroundColor(this.t().bgCard)
+    .backdropBlur(this.t().blurAmount)
+    .border({ width: 1, color: this.t().border })
+    .borderRadius(this.t().radiusMd)
     .shadow({
-      radius: 4,
-      color: '#0A000000',
+      radius: this.t().shadowCardRadius,
+      color: this.t().shadowCardColor,
       offsetX: 0,
-      offsetY: 1
+      offsetY: this.t().shadowCardOffsetY
     })
-    .onClick(() => {
-      this.markRead(item.id);
-    })
+    .onClick(() => { this.markRead(item.id); })
   }
 
   // ==================== 私有方法 ====================
@@ -355,18 +345,12 @@ export struct AlertPage {
   }
 
   private getFilteredAlerts(): AlertItem[] {
-    if (this.currentFilter === 'all') {
-      return this.alerts;
-    }
+    if (this.currentFilter === 'all') { return this.alerts; }
     if (this.currentFilter === 'unread') {
-      return this.alerts.filter((item: AlertItem) => {
-        return this.isUnread(item.id);
-      });
+      return this.alerts.filter((item: AlertItem) => this.isUnread(item.id));
     }
     if (this.currentFilter === 'danger') {
-      return this.alerts.filter((item: AlertItem) => {
-        return item.level === 1;
-      });
+      return this.alerts.filter((item: AlertItem) => item.level === 1);
     }
     return this.alerts;
   }
@@ -380,9 +364,7 @@ export struct AlertPage {
   private markAllRead(): void {
     const newReadIds: string[] = [...this.readIds];
     this.alerts.forEach((item: AlertItem) => {
-      if (newReadIds.indexOf(item.id) === -1) {
-        newReadIds.push(item.id);
-      }
+      if (newReadIds.indexOf(item.id) === -1) { newReadIds.push(item.id); }
     });
     this.readIds = newReadIds;
   }
@@ -390,9 +372,7 @@ export struct AlertPage {
   private getUnreadCount(): number {
     let count: number = 0;
     this.alerts.forEach((item: AlertItem) => {
-      if (this.isUnread(item.id)) {
-        count = count + 1;
-      }
+      if (this.isUnread(item.id)) { count = count + 1; }
     });
     return count;
   }
@@ -400,24 +380,16 @@ export struct AlertPage {
   private getDangerCount(): number {
     let count: number = 0;
     this.alerts.forEach((item: AlertItem) => {
-      if (item.level === 1) {
-        count = count + 1;
-      }
+      if (item.level === 1) { count = count + 1; }
     });
     return count;
   }
 
   private getLevelColor(level: number): string {
-    if (level === 1) {
-      return StyleConstants.DANGER;
-    }
-    return StyleConstants.WARNING;
+    return level === 1 ? this.t().danger : this.t().warning;
   }
 
   private getLevelText(level: number): string {
-    if (level === 1) {
-      return '危险';
-    }
-    return '警告';
+    return level === 1 ? '危险' : '警告';
   }
 }

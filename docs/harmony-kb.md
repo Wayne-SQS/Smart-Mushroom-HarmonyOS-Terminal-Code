@@ -248,9 +248,50 @@ POST /v5/iot/{projectId}/devices/{deviceId}/commands
 
 ---
 
-## 七、待补充事项
+## 七、API 24 (6.1.1) 实战踩坑记录 + 社区最佳实践
 
-- [ ] 网络异常降级到 mock 的统一策略(参考 `DashboardViewModel.handleAsync`)
-- [ ] Token 过期自动重试中间件
-- [ ] HMS Map Kit 集成(第四阶段)
-- [ ] 多端模拟器测试矩阵(第五阶段)
+> 以下均为本项目在 API 24 模拟器上实际验证的结论，结合华为开发者社区最佳实践。
+
+### 7.1 颜色格式：8 位 hex (#RRGGBBAA) 不可用
+
+**结论：API 24 模拟器上 8 位 hex 颜色解析不稳定，部分属性失效。**
+
+- ❌ `'#FFFFFFA6'` — 8 位 hex，不可用
+- ✅ `'#FFFFFF'` — 6 位 hex，正常
+- 本项目应对：所有 Token 颜色统一用 6 位 hex。
+
+### 7.2 深色模式
+
+必须锁定 `COLOR_MODE_LIGHT`，否则系统深色会反转自定义颜色导致发黄。
+
+### 7.3 主题切换：PersistentStorage + AppStorage + @StorageLink（社区标准方案）
+
+**来源**：51CTO 星光计划 + 腾讯云开发者总结
+
+```typescript
+// ThemeManager 构造函数
+PersistentStorage.persistProp('themeName', 'frosted');
+// ↑ 自动：磁盘 ⇄ AppStorage ⇄ @StorageLink 双向同步
+
+// 组件中
+@StorageLink('themeName') themeName: string = 'frosted';
+// this.themeName = 'contrast' → AppStorage → PersistentStorage 自动落盘
+```
+
+**不需要**手动 preferences 存取。PersistentStorage 全自动。
+
+### 7.4 ArkTS struct 中 getter 不可用
+
+`private get xxx()` 在某些场景 `this` 绑定丢失返回 `undefined`，改用公开方法 `t()`。
+
+### 7.5 @StorageLink 更新顺序
+
+```typescript
+// ✅ 正确：先更新数据，再触发刷新
+ThemeManager.setTheme(newValue);  // 先更新 current
+this.themeName = newValue;        // 再触发所有页面 rebuild
+```
+
+---
+
+## 八、待补充事项

@@ -1,26 +1,27 @@
-import { StyleConstants, SensorType, SensorConfigUtil, BreakpointConstants, AdaptiveUtils, Logger, BarChartComponent, ChartPoint } from 'common-base';
+import { SensorType, SensorConfigUtil, BreakpointConstants, AdaptiveUtils, Logger, BarChartComponent, ChartPoint } from 'common-base';
 import { SensorDataItem, AlertItem, ControlItem } from '../model/GreenhouseModel';
 import { DashboardViewModel } from '../viewmodel/DashboardViewModel';
 import { AlertViewModel } from '../viewmodel/AlertViewModel';
+import { ThemeManager } from '../theme/ThemeManager';
+import { ThemeTokens } from '../theme/ThemeTokens';
 import promptAction from '@ohos.promptAction';
-import { BusinessError } from '@kit.BasicServicesKit';
 
 const TAG = 'DashboardPage';
 
 /**
  * 首页 - 大棚环境仪表盘
  *
- * 数据驱动：
- * - @State 初始化为空，aboutToAppear 同步 viewModel mock 数据避免首帧空白
- * - 异步加载云端属性，成功后覆盖 mock，失败保持 mock
- * - 概览卡片由 @State overview* 字段驱动（来自 viewModel.overview）
- * - 告警由 AlertViewModel.loadFromSensors 从 sensors 派生，Page 不再持有硬编码 alerts
- *
- * 响应式：GridRow/GridCol 适配多端断点
+ * 主题驱动：所有颜色从 this.t 读取（ThemeManager 单例），零硬编码。
+ * 毛玻璃：卡片用 backdropBlur，装饰光晕用 blur，严禁混用。
+ * 字号：小字号用 this.t().fontXs~fontXl，大字号（传感器数值/概览数字）用 AdaptiveUtils 断点自适应。
+ * 动画：脉冲动画只动 scale（复合属性），黑白主题 animationEnabled=false 时跳过。
  */
 @Component
 export struct DashboardPage {
   @StorageLink('currentBreakpoint') currentBreakpoint: string = BreakpointConstants.SM;
+  /** 监听主题切换，框架自动触发 build() 重绘 */
+  @StorageLink('themeName') themeName: string = 'frosted';
+
   @State greenhouseName: string = '1号蘑菇大棚';
   @State greenhouseStatus: string = '运行正常';
   @State weather: string = '多云 18°C';
@@ -39,8 +40,26 @@ export struct DashboardPage {
   // 24h 趋势数据（mock 演示，可后续接入历史接口）
   @State trendData: ChartPoint[] = [];
 
+  // 脉冲动画状态
+  @State pulseScale: number = 1;
+  @State pulsingId: string = '';
+
+  // 卡片 stagger 入场
+  @State cardEntrance: number = 0; // 0→6，每完成一张 +1
+  private staggerTimers: number[] = [];
+
+  // 呼吸光晕（危险传感器）
+  @State breathingPhase: number = 0; // 0→1→0 循环
+  private breathingActive: boolean = false;
+  private breathingTimer: number = -1;
+
   private viewModel: DashboardViewModel = new DashboardViewModel();
   private alertViewModel: AlertViewModel = new AlertViewModel();
+
+  /** 一行获取所有 token */
+  t(): ThemeTokens {
+    return ThemeManager.getInstance().getTokens();
+  }
 
   aboutToAppear(): void {
     // 1. 同步 mock 数据，避免首帧空白
@@ -51,6 +70,62 @@ export struct DashboardPage {
     this.buildTrendData();
     // 2. 异步加载云端属性
     this.loadFromViewModel();
+    // 3. 入场动画（黑白主题跳过）
+    if (this.t().animationEnabled) {
+      this.startStaggerEntrance();
+      this.checkBreathingGlow();
+    }
+  }
+
+  aboutToDisappear(): void {
+    this.stopStaggerEntrance();
+    this.stopBreathingGlow();
+  }
+
+  /** 卡片 stagger 渐入：6 张传感器 + 1 概览 + 1 趋势 + 1 控制 + 1 告警 = 10 层 */
+  private startStaggerEntrance(): void {
+    const count = 10;
+    for (let i = 0; i < count; i++) {
+      const timer = setTimeout(() => {
+        this.cardEntrance = this.cardEntrance + 1;
+      }, i * 50);
+      this.staggerTimers.push(timer);
+    }
+  }
+
+  private stopStaggerEntrance(): void {
+    for (let i = 0; i < this.staggerTimers.length; i++) {
+      clearTimeout(this.staggerTimers[i]);
+    }
+    this.staggerTimers = [];
+  }
+
+  /** 检测是否有危险状态传感器，有则启动呼吸光晕 */
+  private checkBreathingGlow(): void {
+    const hasDanger = this.sensors.some((s: SensorDataItem) => s.status >= 2);
+    if (hasDanger && !this.breathingActive) {
+      this.breathingActive = true;
+      this.breathLoop();
+    }
+  }
+
+  private breathLoop(): void {
+    if (!this.breathingActive) { return; }
+    animateTo({
+      duration: 1500,
+      curve: Curve.EaseInOut,
+      iterations: 1,
+      onFinish: () => {
+        this.breathingPhase = this.breathingPhase > 0.5 ? 0 : 1;
+        this.breathLoop();
+      }
+    }, () => {
+      this.breathingPhase = this.breathingPhase > 0.5 ? 0 : 1;
+    });
+  }
+
+  private stopBreathingGlow(): void {
+    this.breathingActive = false;
   }
 
   private async loadFromViewModel(): Promise<void> {
@@ -127,6 +202,24 @@ export struct DashboardPage {
     }
   }
 
+  /** 触发脉冲动画（黑白主题 animationEnabled=false 时跳过） */
+  private triggerPulse(itemId: string): void {
+    if (!this.t().animationEnabled) {
+      return;
+    }
+    this.pulsingId = itemId;
+    animateTo({
+      duration: this.t().animationDuration,
+      curve: Curve.EaseOut,
+      onFinish: () => {
+        this.pulseScale = 1;
+        this.pulsingId = '';
+      }
+    }, () => {
+      this.pulseScale = 1.3;
+    });
+  }
+
   private onAlertClick(): void {
     try {
       const stack = AppStorage.get<NavPathStack>('navPathStack');
@@ -151,12 +244,14 @@ export struct DashboardPage {
       }
       .width('100%')
       .height('100%')
+      .backgroundColor(this.t().bgPage)
     } else {
       Column() {
         this.ContentBody()
       }
       .width('100%')
       .height('100%')
+      .backgroundColor(this.t().bgPage)
     }
   }
 
@@ -177,7 +272,7 @@ export struct DashboardPage {
     }
     .layoutWeight(1)
     .scrollBar(BarState.Auto)
-    .backgroundColor(StyleConstants.BG_PAGE)
+    .backgroundColor(this.t().bgPage)
   }
 
   private getPagePadding(): number {
@@ -201,34 +296,82 @@ export struct DashboardPage {
     return Math.floor(12 / cols);
   }
 
-  // ==================== 顶部 Header ====================
+  /** 状态色：0=正常 1=警告 2=危险 */
+  private getStatusColor(status: number): string {
+    switch (status) {
+      case 0: return this.t().success;
+      case 1: return this.t().warning;
+      case 2: return this.t().danger;
+      default: return this.t().success;
+    }
+  }
+
+  /**
+   * 控制项强调色（主题感知，替代 StyleConstants 静态色）
+   *
+   * 雾透主题：柔和的品牌色系；黑白主题：高对比纯色。
+   * 用于控制按钮的激活态边框与文字。
+   */
+  private getControlAccentColor(controlId: string): string {
+    switch (controlId) {
+      case 'fan':   return this.t().info;
+      case 'condi': return this.t().primary;
+      case 'light': return this.t().warning;
+      default:      return this.t().primary;
+    }
+  }
+
+  // ==================== 顶部 Header（深色渐变 + 装饰光晕） ====================
   @Builder
   HeaderSection() {
     Stack({ alignContent: Alignment.TopStart }) {
+      // 背景：深色渐变（保证白字对比度）
       Column()
         .width('100%')
         .height(180)
         .linearGradient({
-          angle: 135,
-          colors: [[StyleConstants.PRIMARY_DARK, 0.0], [StyleConstants.PRIMARY, 0.5], ['#388E3C', 1.0]]
+          angle: 150,
+          colors: [
+            [this.t().headerGradientTop, 0.0],
+            [this.t().headerGradientBottom, 1.0]
+          ]
         })
 
+      // 右上装饰光晕 — 用 .blur() 模糊自身（不是 backdropBlur）
+      Ellipse()
+        .width(200)
+        .height(200)
+        .fill(this.t().primary)
+        .blur(60)
+        .opacity(0.15)
+        .position({ x: '60%', y: '-30%' })
+
+      // 左下装饰光晕
+      Ellipse()
+        .width(150)
+        .height(150)
+        .fill(this.t().primaryLight)
+        .blur(50)
+        .opacity(0.1)
+        .position({ x: '-10%', y: '60%' })
+
+      // 内容层（大棚名、状态、天气、告警条）
       Column() {
         Blank().height(44)
 
         Row() {
           Column() {
             Text(this.greenhouseName)
-              .fontSize(StyleConstants.FONT_XL)
-              .fontColor(StyleConstants.TEXT_WHITE)
+              .fontSize(this.t().fontXl)
+              .fontColor(this.t().textWhite)
               .fontWeight(FontWeight.Bold)
             Row() {
               Circle({ width: 8, height: 8 })
-                .fill(StyleConstants.SUCCESS)
-                .shadow({ radius: 4, color: StyleConstants.SUCCESS, offsetX: 0, offsetY: 0 })
+                .fill(this.t().success)
+                .shadow({ radius: 4, color: this.t().success, offsetX: 0, offsetY: 0 })
               Text(this.greenhouseStatus)
-                .fontSize(StyleConstants.FONT_SM)
-                .fontColor(StyleConstants.TEXT_WHITE_SUB)
+                .fontSize(this.t().fontSm)
+                .fontColor(this.t().textWhiteSub)
                 .margin({ left: 6 })
             }
             .margin({ top: 4 })
@@ -240,8 +383,8 @@ export struct DashboardPage {
           Column() {
             Text('☁').fontSize(28)
             Text(this.weather)
-              .fontSize(StyleConstants.FONT_SM)
-              .fontColor(StyleConstants.TEXT_WHITE_SUB)
+              .fontSize(this.t().fontSm)
+              .fontColor(this.t().textWhiteSub)
               .margin({ top: 2 })
           }
           .alignItems(HorizontalAlign.Center)
@@ -251,22 +394,22 @@ export struct DashboardPage {
 
         if (this.activeAlerts > 0) {
           Row() {
-            Text('⚠').fontSize(14).fontColor(StyleConstants.WARNING)
+            Text('⚠').fontSize(this.t().fontSm).fontColor(this.t().warning)
             Text(`${this.activeAlerts}条待处理告警`)
-              .fontSize(StyleConstants.FONT_SM)
-              .fontColor(StyleConstants.TEXT_WHITE)
+              .fontSize(this.t().fontSm)
+              .fontColor(this.t().textTitle)
               .margin({ left: 6 })
             Blank()
             Text('查看 >')
-              .fontSize(StyleConstants.FONT_SM)
-              .fontColor(StyleConstants.TEXT_WHITE_SUB)
+              .fontSize(this.t().fontSm)
+              .fontColor(this.t().textSub)
           }
           .width('100%')
           .height(36)
           .padding({ left: 16, right: 16 })
           .margin({ top: 12 })
-          .backgroundColor('#FFFFFF20')
-          .borderRadius(StyleConstants.RADIUS_SM)
+          .backgroundColor(this.t().bgCardLight)
+          .borderRadius(this.t().radiusSm)
           .onClick(() => {
             this.onAlertClick();
           })
@@ -276,63 +419,77 @@ export struct DashboardPage {
     }
     .width('100%')
     .height(180)
+    .shadow({
+      radius: this.t().shadowHeaderRadius,
+      color: this.t().shadowHeaderColor,
+      offsetX: 0,
+      offsetY: this.t().shadowHeaderOffsetY
+    })
   }
 
-  // ==================== 概览卡片 ====================
+  // ==================== 概览卡片（毛玻璃 + 大字号断点自适应） ====================
   @Builder
   OverviewCard() {
     Row() {
-      this.OverviewMetric('📡', this.overviewOnline.toString(), '在线设备', StyleConstants.PRIMARY)
-      Divider().vertical(true).height(36).color(StyleConstants.BORDER_LIGHT)
-      this.OverviewMetric('🍄', this.overviewYield, '今日采收', StyleConstants.ACCENT)
-      Divider().vertical(true).height(36).color(StyleConstants.BORDER_LIGHT)
-      this.OverviewMetric('📦', this.overviewBatches.toString(), '在培批次', StyleConstants.INFO)
+      this.StatItem('在线设备', this.overviewOnline.toString(), this.t().success)
+      Divider().vertical(true).height(36).color(this.t().divider)
+      this.StatItem('今日采收', this.overviewYield, this.t().info)
+      Divider().vertical(true).height(36).color(this.t().divider)
+      this.StatItem('在培批次', this.overviewBatches.toString(), this.t().warning)
     }
+    .opacity(this.cardEntrance > 5 ? 1 : 0)
+    .translate({ y: this.cardEntrance > 5 ? 0 : 16 })
+    .animation({ duration: 400, curve: Curve.EaseOut })
     .width('100%')
     .padding({ top: 18, bottom: 18 })
-    .backgroundColor(StyleConstants.BG_CARD)
-    .borderRadius(StyleConstants.RADIUS_LG)
+    .backgroundColor(this.t().bgCard)
+    .backdropBlur(this.t().blurAmount)
+    .border({ width: 1, color: this.t().border })
+    .borderRadius(this.t().radiusLg)
     .shadow({
-      radius: StyleConstants.SHADOW_CARD_RADIUS,
-      color: StyleConstants.SHADOW_CARD_COLOR,
+      radius: this.t().shadowCardRadius,
+      color: this.t().shadowCardColor,
       offsetX: 0,
-      offsetY: StyleConstants.SHADOW_CARD_OFFSETY
+      offsetY: this.t().shadowCardOffsetY
     })
     .margin({ top: 14 })
   }
 
   @Builder
-  OverviewMetric(icon: string, value: string, label: string, color: string) {
+  StatItem(label: string, value: string, accentColor: string) {
     Column() {
-      Text(icon)
-        .fontSize(20)
-        .width(40)
-        .height(40)
-        .textAlign(TextAlign.Center)
-        .borderRadius(20)
-        .backgroundColor(color + '18')
+      // 装饰彩条（accentColor 仅供装饰，不作文字色）
+      Row()
+        .width(24)
+        .height(3)
+        .borderRadius(2)
+        .backgroundColor(accentColor)
+        .margin({ bottom: 8 })
+      // 大字号走 AdaptiveUtils 断点自适应，不走 token 固定字号
       Text(value)
-        .fontSize(StyleConstants.FONT_XL)
-        .fontColor(color)
+        .fontSize(AdaptiveUtils.getOverviewFontSize(this.currentBreakpoint))
+        .fontColor(this.t().textTitle)
         .fontWeight(FontWeight.Bold)
-        .margin({ top: 6 })
       Text(label)
-        .fontSize(StyleConstants.FONT_SM)
-        .fontColor(StyleConstants.TEXT_SUB)
-        .margin({ top: 2 })
+        .fontSize(this.t().fontSm)
+        .fontColor(this.t().textSub)
+        .margin({ top: 4 })
     }
     .layoutWeight(1)
     .alignItems(HorizontalAlign.Center)
   }
 
-  // ==================== 传感器网格 ====================
+  // ==================== 传感器网格（毛玻璃 + 状态光晕） ====================
   @Builder
   SensorGrid() {
     GridRow({ gutter: { x: 10, y: 10 } }) {
-      ForEach(this.sensors, (item: SensorDataItem) => {
+      ForEach(this.sensors, (item: SensorDataItem, index: number) => {
         GridCol({ span: this.getSensorSpan() }) {
-            this.SensorCard(item)
+            this.SensorCard(item, index)
           }
+          .opacity(this.cardEntrance > index ? 1 : 0)
+          .translate({ y: this.cardEntrance > index ? 0 : 20 })
+          .animation({ duration: 400, curve: Curve.EaseOut })
       })
     }
     .width('100%')
@@ -340,45 +497,49 @@ export struct DashboardPage {
   }
 
   @Builder
-  SensorCard(item: SensorDataItem) {
-    Row() {
-      // 左侧色条 — 自动跟随内容高度，不用 height('100%')
-      Column()
-        .width(3)
-        .alignSelf(ItemAlign.Stretch)
-        .backgroundColor(item.status === 0 ? StyleConstants.SUCCESS : item.status === 1 ? StyleConstants.WARNING : StyleConstants.DANGER)
-        .borderRadius(2)
+  SensorCard(item: SensorDataItem, index: number) {
+    Stack() {
+      // 状态光晕 — 危险传感器呼吸：opacity 由 breathingPhase 驱动
+      Ellipse()
+        .width('80%')
+        .height(30)
+        .fill(this.getStatusColor(item.status))
+        .blur(20)
+        .opacity(item.status >= 2 && this.breathingActive
+          ? 0.2 + this.breathingPhase * 0.5  // 呼吸：0.2 ↔ 0.7
+          : 0.4)
+        .position({ x: '10%', y: '70%' })
 
       Column() {
-        // 一行：图标 + 名称 + 状态点
+        // 图标 + 状态点
         Row() {
-          Text(SensorConfigUtil.getConfig(item.type as SensorType).icon).fontSize(12)
+          Text(SensorConfigUtil.getConfig(item.type as SensorType).icon).fontSize(this.t().fontSm)
           Text(SensorConfigUtil.getConfig(item.type as SensorType).name)
-            .fontSize(11)
-            .fontColor(StyleConstants.TEXT_SUB)
+            .fontSize(this.t().fontXs)
+            .fontColor(this.t().textSub)
             .margin({ left: 6 })
             .maxLines(1)
           Blank()
           Circle({ width: 5, height: 5 })
-            .fill(item.status === 0 ? StyleConstants.SUCCESS : item.status === 1 ? StyleConstants.WARNING : StyleConstants.DANGER)
+            .fill(this.getStatusColor(item.status))
         }
         .width('100%')
 
-        // 一行：数值 + 单位
+        // 数值 + 单位（大字号走 AdaptiveUtils 断点自适应）
         Row() {
           Text(item.value.toFixed(1))
             .fontSize(AdaptiveUtils.getSensorDataFontSize(this.currentBreakpoint))
-            .fontColor(StyleConstants.TEXT_TITLE)
+            .fontColor(this.t().textTitle)
             .fontWeight(FontWeight.Bold)
           Text(SensorConfigUtil.getConfig(item.type as SensorType).unit)
-            .fontSize(10)
-            .fontColor(StyleConstants.TEXT_SUB)
+            .fontSize(this.t().fontXs)
+            .fontColor(this.t().textSub)
             .margin({ left: 2, bottom: 2 })
         }
         .alignItems(VerticalAlign.Bottom)
         .margin({ top: 2 })
       }
-      .layoutWeight(1)
+      .width('100%')
       .padding({
         left: 8,
         right: AdaptiveUtils.getSensorCardPadding(this.currentBreakpoint),
@@ -388,29 +549,31 @@ export struct DashboardPage {
       .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
-    .backgroundColor(StyleConstants.BG_CARD)
-    .borderRadius(StyleConstants.RADIUS_MD)
+    .backgroundColor(this.t().bgCard)
+    .backdropBlur(this.t().blurAmount)
+    .border({ width: 1, color: this.t().border })
+    .borderRadius(this.t().radiusMd)
     .shadow({
-      radius: 4,
-      color: '#0A000000',
+      radius: this.t().shadowCardRadius,
+      color: this.t().shadowCardColor,
       offsetX: 0,
-      offsetY: 1
+      offsetY: this.t().shadowCardOffsetY
     })
   }
 
-  // ==================== 趋势图 ====================
+  // ==================== 趋势图（毛玻璃卡片） ====================
   @Builder
   TrendSection() {
     Column() {
       Row() {
         Text('24小时趋势')
-          .fontSize(StyleConstants.FONT_LG)
-          .fontColor(StyleConstants.TEXT_TITLE)
+          .fontSize(this.t().fontLg)
+          .fontColor(this.t().textTitle)
           .fontWeight(FontWeight.Bold)
         Blank()
         Text('温度 °C')
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(StyleConstants.TEXT_HINT)
+          .fontSize(this.t().fontSm)
+          .fontColor(this.t().textSub)
       }
       .width('100%')
       .margin({ bottom: 10 })
@@ -418,38 +581,46 @@ export struct DashboardPage {
       if (this.trendData.length > 0) {
         BarChartComponent({
           data: this.trendData,
-          barColor: StyleConstants.PRIMARY_LIGHT,
+          barColor: this.t().primaryLight,
+          labelColor: this.t().textTitle,
+          axisColor: this.t().textSub,
+          baselineColor: this.t().divider,
           chartHeight: 160
         })
       } else {
         Column()
           .width('100%')
           .height(160)
-          .backgroundColor(StyleConstants.BG_CARD_LIGHT)
-          .borderRadius(StyleConstants.RADIUS_SM)
+          .backgroundColor(this.t().bgCardLight)
+          .borderRadius(this.t().radiusSm)
       }
     }
     .width('100%')
     .padding(14)
-    .backgroundColor(StyleConstants.BG_CARD)
-    .borderRadius(StyleConstants.RADIUS_LG)
+    .backgroundColor(this.t().bgCard)
+    .backdropBlur(this.t().blurAmount)
+    .border({ width: 1, color: this.t().border })
+    .borderRadius(this.t().radiusLg)
     .margin({ top: 12 })
     .shadow({
-      radius: 4,
-      color: '#0A000000',
+      radius: this.t().shadowCardRadius,
+      color: this.t().shadowCardColor,
       offsetX: 0,
-      offsetY: 1
+      offsetY: this.t().shadowCardOffsetY
     })
+    .opacity(this.cardEntrance > 6 ? 1 : 0)
+    .translate({ y: this.cardEntrance > 6 ? 0 : 16 })
+    .animation({ duration: 400, curve: Curve.EaseOut })
   }
 
-  // ==================== 快捷控制 ====================
+  // ==================== 快捷控制（脉冲动画） ====================
   @Builder
   QuickControlSection() {
     Column() {
       Row() {
         Text('快捷控制')
-          .fontSize(StyleConstants.FONT_LG)
-          .fontColor(StyleConstants.TEXT_TITLE)
+          .fontSize(this.t().fontLg)
+          .fontColor(this.t().textTitle)
           .fontWeight(FontWeight.Bold)
       }
       .margin({ bottom: 10 })
@@ -461,27 +632,32 @@ export struct DashboardPage {
               Text(item.icon).fontSize(28)
               if (item.active) {
                 Circle({ width: 10, height: 10 })
-                  .fill(StyleConstants.SUCCESS)
+                  .fill(this.t().success)
                   .position({ x: 28, y: 2 })
-                  .shadow({ radius: 4, color: StyleConstants.SUCCESS, offsetX: 0, offsetY: 0 })
+                  .shadow({ radius: 4, color: this.t().success, offsetX: 0, offsetY: 0 })
               }
             }
             .width(52)
             .height(52)
             .borderRadius(26)
-            .backgroundColor(item.active ? item.color + '20' : StyleConstants.BG_CARD_LIGHT)
-            .border({ width: item.active ? 2 : 0, color: item.color })
-            .scale(item.active ? { x: 1.05, y: 1.05 } : { x: 1.0, y: 1.0 })
-            .animation({ duration: 200, curve: Curve.EaseOut })
+            // 禁止 alpha 拼接：用 bgCard（更不透明）区分激活态，bgCardLight 区分非激活态
+            .backgroundColor(item.active ? this.t().bgCard : this.t().bgCardLight)
+            .border({ width: item.active ? 2 : 0, color: this.getControlAccentColor(item.id) })
+            // 脉冲动画只动 scale（复合属性），黑白主题跳过
+            .scale(this.pulsingId === item.id
+              ? { x: this.pulseScale, y: this.pulseScale }
+              : { x: 1, y: 1 })
+            .animation({ duration: this.t().animationDuration, curve: Curve.EaseOut })
 
             Text(item.name)
-              .fontSize(StyleConstants.FONT_SM)
-              .fontColor(item.active ? item.color : StyleConstants.TEXT_SUB)
+              .fontSize(this.t().fontSm)
+              .fontColor(item.active ? this.getControlAccentColor(item.id) : this.t().textSub)
               .margin({ top: 6 })
           }
           .layoutWeight(1)
           .alignItems(HorizontalAlign.Center)
           .onClick(() => {
+            this.triggerPulse(item.id);
             this.onControlToggle(item);
           })
         })
@@ -490,65 +666,70 @@ export struct DashboardPage {
     }
     .width('100%')
     .padding(14)
-    .backgroundColor(StyleConstants.BG_CARD)
-    .borderRadius(StyleConstants.RADIUS_LG)
+    .backgroundColor(this.t().bgCard)
+    .backdropBlur(this.t().blurAmount)
+    .border({ width: 1, color: this.t().border })
+    .borderRadius(this.t().radiusLg)
     .margin({ top: 12 })
     .shadow({
-      radius: 4,
-      color: '#0A000000',
+      radius: this.t().shadowCardRadius,
+      color: this.t().shadowCardColor,
       offsetX: 0,
-      offsetY: 1
+      offsetY: this.t().shadowCardOffsetY
     })
+    .opacity(this.cardEntrance > 7 ? 1 : 0)
+    .translate({ y: this.cardEntrance > 7 ? 0 : 16 })
+    .animation({ duration: 400, curve: Curve.EaseOut })
   }
 
-  // ==================== 实时告警 ====================
+  // ==================== 实时告警（毛玻璃卡片） ====================
   @Builder
   AlertSection() {
     Column() {
       Row() {
         Text('实时告警')
-          .fontSize(StyleConstants.FONT_LG)
-          .fontColor(StyleConstants.TEXT_TITLE)
+          .fontSize(this.t().fontLg)
+          .fontColor(this.t().textTitle)
           .fontWeight(FontWeight.Bold)
         Blank()
         Text(`${this.alerts.length}条`)
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(this.alerts.length > 0 ? StyleConstants.DANGER : StyleConstants.TEXT_HINT)
+          .fontSize(this.t().fontSm)
+          .fontColor(this.alerts.length > 0 ? this.t().danger : this.t().textSub)
       }
       .width('100%')
       .margin({ bottom: 10 })
 
       if (this.alerts.length === 0) {
         Row() {
-          Text('✓').fontSize(16).fontColor(StyleConstants.SUCCESS)
+          Text('✓').fontSize(this.t().fontMd).fontColor(this.t().success)
           Text('所有传感器正常')
-            .fontSize(StyleConstants.FONT_SM)
-            .fontColor(StyleConstants.TEXT_SUB)
+            .fontSize(this.t().fontSm)
+            .fontColor(this.t().textSub)
             .margin({ left: 8 })
         }
         .width('100%')
         .height(48)
         .padding({ left: 14, right: 14 })
-        .backgroundColor(StyleConstants.BG_CARD_LIGHT)
-        .borderRadius(StyleConstants.RADIUS_SM)
+        .backgroundColor(this.t().bgCardLight)
+        .borderRadius(this.t().radiusSm)
       } else {
         ForEach(this.alerts, (item: AlertItem) => {
           Row() {
             Column()
               .width(3)
               .height(40)
-              .backgroundColor(item.level === 1 ? StyleConstants.DANGER : StyleConstants.WARNING)
+              .backgroundColor(item.level === 1 ? this.t().danger : this.t().warning)
               .borderRadius({ topLeft: 2, bottomLeft: 2 })
 
             Column() {
               Text(item.message)
-                .fontSize(StyleConstants.FONT_MD)
-                .fontColor(StyleConstants.TEXT_TITLE)
+                .fontSize(this.t().fontMd)
+                .fontColor(this.t().textTitle)
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
               Text(`${item.device} · ${item.time}`)
-                .fontSize(StyleConstants.FONT_XS)
-                .fontColor(StyleConstants.TEXT_HINT)
+                .fontSize(this.t().fontXs)
+                .fontColor(this.t().textSub)
                 .margin({ top: 4 })
             }
             .layoutWeight(1)
@@ -556,30 +737,36 @@ export struct DashboardPage {
             .padding({ left: 10, right: 8 })
 
             Text(item.level === 1 ? '危险' : '警告')
-              .fontSize(StyleConstants.FONT_XS)
-              .fontColor(item.level === 1 ? StyleConstants.DANGER : StyleConstants.WARNING)
+              .fontSize(this.t().fontXs)
+              .fontColor(item.level === 1 ? this.t().danger : this.t().warning)
               .padding({ left: 6, right: 6, top: 2, bottom: 2 })
               .borderRadius(4)
-              .backgroundColor((item.level === 1 ? StyleConstants.DANGER : StyleConstants.WARNING) + '18')
+              // 禁止 alpha 拼接：用 bgCardLight 替代 color + '18'
+              .backgroundColor(this.t().bgCardLight)
           }
           .width('100%')
           .height(56)
-          .backgroundColor(StyleConstants.BG_CARD_LIGHT)
-          .borderRadius(StyleConstants.RADIUS_SM)
+          .backgroundColor(this.t().bgCardLight)
+          .borderRadius(this.t().radiusSm)
           .margin({ bottom: 8 })
         })
       }
     }
     .width('100%')
     .padding(14)
-    .backgroundColor(StyleConstants.BG_CARD)
-    .borderRadius(StyleConstants.RADIUS_LG)
+    .backgroundColor(this.t().bgCard)
+    .backdropBlur(this.t().blurAmount)
+    .border({ width: 1, color: this.t().border })
+    .borderRadius(this.t().radiusLg)
     .margin({ top: 12 })
     .shadow({
-      radius: 4,
-      color: '#0A000000',
+      radius: this.t().shadowCardRadius,
+      color: this.t().shadowCardColor,
       offsetX: 0,
-      offsetY: 1
+      offsetY: this.t().shadowCardOffsetY
     })
+    .opacity(this.cardEntrance > 8 ? 1 : 0)
+    .translate({ y: this.cardEntrance > 8 ? 0 : 16 })
+    .animation({ duration: 400, curve: Curve.EaseOut })
   }
 }

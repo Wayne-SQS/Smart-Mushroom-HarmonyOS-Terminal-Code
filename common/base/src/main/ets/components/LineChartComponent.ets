@@ -3,14 +3,17 @@ import { ChartPoint, ChartUtils } from './ChartComponent';
 /**
  * 折线图组件
  *
- * 单系列折线图，Canvas 自绘
- * 用法：LineChartComponent({ data: points, lineColor: '#1890FF', height: 200 })
+ * 单系列折线图，Canvas 自绘。所有颜色通过 @Prop 传入，支持主题切换。
+ * 用法：LineChartComponent({ data: points, lineColor: '#1890FF', chartHeight: 200 })
  */
 @Component
 export struct LineChartComponent {
   @Prop data: ChartPoint[];
   @Prop lineColor: string = '#1890FF';
   @Prop chartHeight: number = 200;
+  @Prop gridColor: string = '#F0F0F0';
+  @Prop labelColor: string = '#333333';
+  @Prop axisColor: string = '#999999';
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
 
@@ -40,7 +43,7 @@ export struct LineChartComponent {
     ctx.clearRect(0, 0, w, h);
 
     // 网格线（3 条虚线）
-    ctx.strokeStyle = '#F0F0F0';
+    ctx.strokeStyle = this.gridColor;
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     for (let i = 0; i <= 3; i++) {
@@ -76,7 +79,7 @@ export struct LineChartComponent {
       ctx.arc(x, y, 3, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#333333';
+      ctx.fillStyle = this.labelColor;
       ctx.font = '10px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(this.formatValue(this.data[i].value), x, y - 8);
@@ -84,7 +87,7 @@ export struct LineChartComponent {
     }
 
     // X 轴 label
-    ctx.fillStyle = '#999999';
+    ctx.fillStyle = this.axisColor;
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
     for (let i = 0; i < this.data.length; i++) {

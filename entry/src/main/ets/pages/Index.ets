@@ -1,5 +1,15 @@
-import { StyleConstants, BreakpointConstants, AdaptiveUtils } from 'common-base';
-import { DashboardPage, DevicePage, MapPage, ProfilePage, AlertPage, GrowthPage, RecipePage } from 'features-core';
+import { BreakpointConstants, AdaptiveUtils } from 'common-base';
+import {
+  DashboardPage,
+  DevicePage,
+  MapPage,
+  ProfilePage,
+  AlertPage,
+  GrowthPage,
+  RecipePage,
+  ThemeManager,
+  ThemeTokens
+} from 'features-core';
 import { AppRouter } from './AppRouter';
 
 /**
@@ -20,6 +30,13 @@ struct Index {
   @State currentIndex: number = 0;
   @State navPathStack: NavPathStack = AppRouter.getStack();
   @State currentBreakpoint: string = BreakpointConstants.SM;
+  /** 监听主题切换，框架自动触发 build() 重绘 */
+  @StorageLink('themeName') themeName: string = 'frosted';
+
+  /** 一行获取当前主题 token（主题切换后 build() 重跑，自动取到新值） */
+  t(): ThemeTokens {
+    return ThemeManager.getInstance().getTokens();
+  }
 
   private tabs: TabItem[] = [
     { title: '首页', icon: '🏠' },
@@ -81,27 +98,44 @@ struct Index {
     })
   }
 
-  /** 窄屏：底部 Tabs */
+  /**
+   * 窄屏：底部 Tabs（毛玻璃 TabBar）
+   *
+   * 关键设计：每个 TabContent 内使用 if/else 条件渲染子页面。
+   * 为什么不用 TabContent { DashboardPage() } 直接嵌套？
+   *   Tabs 组件会保留所有 TabContent 子组件实例，非活跃页面的
+   *   @StorageLink('themeName') 可能不会触发 build()，导致切回时
+   *   仍显示旧主题颜色。条件渲染确保切页时旧页面销毁、新页面重建，
+   *   新建时从 ThemeManager 读取最新主题，与宽屏布局行为一致。
+   */
   @Builder
   TabsBottom() {
     Tabs({ barPosition: BarPosition.End, index: this.currentIndex }) {
       TabContent() {
-        DashboardPage()
+        if (this.currentIndex === 0) {
+          DashboardPage()
+        }
       }
       .tabBar(this.TabBuilder(0))
 
       TabContent() {
-        DevicePage()
+        if (this.currentIndex === 1) {
+          DevicePage()
+        }
       }
       .tabBar(this.TabBuilder(1))
 
       TabContent() {
-        MapPage()
+        if (this.currentIndex === 2) {
+          MapPage()
+        }
       }
       .tabBar(this.TabBuilder(2))
 
       TabContent() {
-        ProfilePage()
+        if (this.currentIndex === 3) {
+          ProfilePage()
+        }
       }
       .tabBar(this.TabBuilder(3))
     }
@@ -113,6 +147,10 @@ struct Index {
     })
     .width('100%')
     .height('100%')
+    // 毛玻璃 TabBar：半透白底 + backdropBlur 模糊下层内容 + 顶边白线
+    .backgroundColor(this.t().bgTabBar)
+    .backdropBlur(this.t().blurAmount)
+    .border({ width: { top: 0.5 }, color: this.t().border })
   }
 
   /** 宽屏：仅内容区，导航由 SideNavBar 承担 */
@@ -140,7 +178,7 @@ struct Index {
     .height('100%')
   }
 
-  /** 侧栏导航（宽屏专用） */
+  /** 侧栏导航（宽屏专用，毛玻璃底） */
   @Builder
   SideNavBar() {
     Column() {
@@ -149,8 +187,8 @@ struct Index {
         Text('🍄')
           .fontSize(32)
         Text('蘑菇大棚')
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(StyleConstants.TEXT_SUB)
+          .fontSize(this.t().fontSm)
+          .fontColor(this.t().textSub)
           .margin({ top: 4 })
       }
       .width('100%')
@@ -169,14 +207,16 @@ struct Index {
 
       // 底部版本信息
       Text('v1.0.0')
-        .fontSize(StyleConstants.FONT_XS)
-        .fontColor(StyleConstants.TEXT_HINT)
+        .fontSize(this.t().fontXs)
+        .fontColor(this.t().textSub)
         .padding({ bottom: 16 })
     }
     .width(96)
     .height('100%')
-    .backgroundColor(StyleConstants.BG_CARD)
-    .border({ width: { right: 0.5 }, color: StyleConstants.BORDER_LIGHT })
+    // 毛玻璃侧栏：半透底 + backdropBlur + 右边白线
+    .backgroundColor(this.t().bgTabBar)
+    .backdropBlur(this.t().blurAmount)
+    .border({ width: { right: 0.5 }, color: this.t().borderLight })
   }
 
   @Builder
@@ -185,17 +225,18 @@ struct Index {
       Text(tab.icon)
         .fontSize(24)
       Text(tab.title)
-        .fontSize(StyleConstants.FONT_XS)
-        .fontColor(this.currentIndex === index ? StyleConstants.PRIMARY : StyleConstants.TEXT_SUB)
+        .fontSize(this.t().fontXs)
+        .fontColor(this.currentIndex === index ? this.t().primary : this.t().textSub)
         .margin({ top: 4 })
     }
     .width('100%')
     .height(64)
     .justifyContent(FlexAlign.Center)
-    .backgroundColor(this.currentIndex === index ? StyleConstants.PRIMARY + '14' : StyleConstants.BG_CARD)
+    // 选中态：用 bgCardLight 区分（不使用 alpha 拼接）；未选中：透明
+    .backgroundColor(this.currentIndex === index ? this.t().bgCardLight : 'transparent')
     .border({
       width: { left: 3 },
-      color: this.currentIndex === index ? StyleConstants.PRIMARY : 'transparent'
+      color: this.currentIndex === index ? this.t().primary : 'transparent'
     })
     .margin({ bottom: 4 })
     .onClick(() => {
@@ -219,10 +260,10 @@ struct Index {
     Column() {
       Text(this.tabs[index].icon)
         .fontSize(22)
-        .fontColor(this.currentIndex === index ? StyleConstants.PRIMARY : StyleConstants.TEXT_HINT)
+        .fontColor(this.currentIndex === index ? this.t().primary : this.t().textSub)
       Text(this.tabs[index].title)
-        .fontSize(StyleConstants.FONT_XS)
-        .fontColor(this.currentIndex === index ? StyleConstants.PRIMARY : StyleConstants.TEXT_HINT)
+        .fontSize(this.t().fontXs)
+        .fontColor(this.currentIndex === index ? this.t().primary : this.t().textSub)
         .margin({ top: 2 })
     }
     .width('100%')

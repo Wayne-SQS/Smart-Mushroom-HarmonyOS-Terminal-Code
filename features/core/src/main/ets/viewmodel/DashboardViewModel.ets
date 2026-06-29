@@ -1,4 +1,4 @@
-import { Logger, SensorType, StyleConstants } from 'common-base';
+import { Logger, SensorType } from 'common-base';
 import { IotService } from '../service/IotService';
 import { SensorDataItem, AlertItem, ControlItem } from '../model/GreenhouseModel';
 import { BaseViewModel } from './BaseViewModel';
@@ -43,11 +43,16 @@ export class DashboardViewModel extends BaseViewModel {
     { type: SensorType.SOIL_TEMP, value: 20.3, min: 15, max: 25, status: 0 }
   ];
 
-  /** 快捷控制项（与嵌入式端 mqtt.c 支持的 3 个执行器对齐） */
+  /**
+   * 快捷控制项（与嵌入式端 mqtt.c 支持的 3 个执行器对齐）
+   *
+   * color 字段为降级占位色；实际渲染时页面通过 ThemeManager 获取主题感知颜色，
+   * 因此 color 仅在页面无法获取主题上下文时作为兜底。
+   */
   controls: ControlItem[] = [
-    { id: 'fan', name: '通风', icon: '🌬', active: true, color: StyleConstants.INFO },
-    { id: 'condi', name: '空调', icon: '❄', active: false, color: StyleConstants.PRIMARY_LIGHT },
-    { id: 'light', name: '补光', icon: '💡', active: false, color: StyleConstants.WARNING }
+    { id: 'fan', name: '通风', icon: '🌬', active: true, color: '#1890FF' },
+    { id: 'condi', name: '空调', icon: '❄', active: false, color: '#2E7D32' },
+    { id: 'light', name: '补光', icon: '💡', active: false, color: '#E6A23C' }
   ];
 
   /** 概览统计 */

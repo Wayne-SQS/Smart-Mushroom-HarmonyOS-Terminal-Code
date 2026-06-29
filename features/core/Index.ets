@@ -44,3 +44,9 @@ export { DashboardViewModel } from './src/main/ets/viewmodel/DashboardViewModel'
 export { DeviceViewModel } from './src/main/ets/viewmodel/DeviceViewModel'
 export { GrowthViewModel } from './src/main/ets/viewmodel/GrowthViewModel'
 export { AlertViewModel } from './src/main/ets/viewmodel/AlertViewModel'
+
+// 主题系统（双主题 + 毛玻璃 + 原子替换）
+export type { ThemeTokens } from './src/main/ets/theme/ThemeTokens'
+export { FROSTED_THEME } from './src/main/ets/theme/ThemeFrosted'
+export { CONTRAST_THEME } from './src/main/ets/theme/ThemeContrast'
+export { ThemeManager } from './src/main/ets/theme/ThemeManager'

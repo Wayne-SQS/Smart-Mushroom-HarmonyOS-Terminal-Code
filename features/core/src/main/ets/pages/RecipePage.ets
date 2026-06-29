@@ -1,17 +1,11 @@
-import { StyleConstants, BreakpointConstants, AdaptiveUtils } from 'common-base';
+import { BreakpointConstants, AdaptiveUtils } from 'common-base';
 import { Recipe, DEFAULT_RECIPES } from '../model/RecipeModel';
 import { IotService } from '../service/IotService';
+import { ThemeManager } from '../theme/ThemeManager';
+import { ThemeTokens } from '../theme/ThemeTokens';
 
 /**
- * 环境配方页面
- *
- * 功能：
- * 1. 蘑菇种植环境参数预设配方浏览
- * 2. 按品种筛选配方
- * 3. 一键应用到 IoT 设备（下发 desired 属性）
- * 4. 自定义配方（新建/删除）
- *
- * 配色：暖棕色 ACCENT 系列（与 GrowthPage 一致）
+ * 环境配方页面 - 主题驱动
  */
 
 interface RecipeFilter {
@@ -22,12 +16,12 @@ interface RecipeFilter {
 @Component
 export struct RecipePage {
   @StorageLink('currentBreakpoint') currentBreakpoint: string = BreakpointConstants.SM;
+  @StorageLink('themeName') themeName: string = 'frosted';
 
   @State recipes: Recipe[] = [...DEFAULT_RECIPES];
   @State currentFilter: string = 'all';
   @State appliedRecipeId: string = '';
   @State showAddForm: boolean = false;
-  // 新建表单字段
   @State formMushroomType: string = '平菇';
   @State formGrowthStage: string = '菌丝期';
   @State formTempMin: number = 20;
@@ -47,6 +41,10 @@ export struct RecipePage {
     { id: '杏鲍菇', label: '杏鲍菇' }
   ];
 
+  t(): ThemeTokens {
+    return ThemeManager.getInstance().getTokens();
+  }
+
   build() {
     if (this.shouldLimitWidth()) {
       Row() {
@@ -60,14 +58,14 @@ export struct RecipePage {
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(StyleConstants.BG_PAGE)
+      .backgroundColor(this.t().bgPage)
     } else {
       Column() {
         this.ContentBody()
       }
       .width('100%')
       .height('100%')
-      .backgroundColor(StyleConstants.BG_PAGE)
+      .backgroundColor(this.t().bgPage)
     }
   }
 
@@ -82,7 +80,6 @@ export struct RecipePage {
     }
   }
 
-  /** 是否需要内容限宽（大屏） */
   private shouldLimitWidth(): boolean {
     return AdaptiveUtils.getMaxContentWidth(this.currentBreakpoint) > 0;
   }
@@ -100,12 +97,12 @@ export struct RecipePage {
     return AdaptiveUtils.getCardGap(this.currentBreakpoint);
   }
 
-  /** 配方卡片 GridCol span：xs/sm 12 / md 6 / lg 6 / xl 4 */
   private getRecipeSpan(): number {
     const cols = AdaptiveUtils.getCardColumns(this.currentBreakpoint);
     return Math.floor(12 / cols);
   }
 
+  // ==================== Header（暖棕色 accent 渐变） ====================
   @Builder
   HeaderSection() {
     Stack({ alignContent: Alignment.TopStart }) {
@@ -114,36 +111,32 @@ export struct RecipePage {
         .height(140)
         .linearGradient({
           angle: 135,
-          colors: [[StyleConstants.ACCENT, 0.0], [StyleConstants.ACCENT_LIGHT, 1.0]]
+          colors: [[this.t().headerGradientTop, 0.0], [this.t().headerGradientBottom, 1.0]]
         })
 
       Row() {
         Column() {
           Text('环境配方')
             .fontSize(AdaptiveUtils.getTitleFontSize(this.currentBreakpoint))
-            .fontColor(StyleConstants.TEXT_WHITE)
+            .fontColor(this.t().textWhite)
             .fontWeight(FontWeight.Bold)
           Text(`${this.recipes.length} 个配方 · 已应用 ${this.appliedRecipeId.length > 0 ? 1 : 0}`)
-            .fontSize(StyleConstants.FONT_SM)
-            .fontColor(StyleConstants.TEXT_WHITE_SUB)
+            .fontSize(this.t().fontSm)
+            .fontColor(this.t().textWhiteSub)
             .margin({ top: 4 })
         }
         .alignItems(HorizontalAlign.Start)
         .layoutWeight(1)
 
         Text(this.showAddForm ? '返回' : '+ 新建')
-          .fontSize(StyleConstants.FONT_MD)
-          .fontColor(StyleConstants.TEXT_WHITE)
+          .fontSize(this.t().fontMd)
+          .fontColor(this.t().textWhite)
           .padding({ left: 14, right: 14, top: 8, bottom: 8 })
-          .backgroundColor('#FFFFFF20')
-          .borderRadius(StyleConstants.RADIUS_SM)
+          .backgroundColor(this.t().bgCardLight)
+          .borderRadius(this.t().radiusSm)
           .onClick(() => {
-            if (this.showAddForm) {
-              this.showAddForm = false;
-              this.resetForm();
-            } else {
-              this.showAddForm = true;
-            }
+            if (this.showAddForm) { this.showAddForm = false; this.resetForm(); }
+            else { this.showAddForm = true; }
           })
       }
       .width('100%')
@@ -154,21 +147,20 @@ export struct RecipePage {
     .height(140)
   }
 
+  // ==================== 筛选 Tab ====================
   @Builder
   FilterTabs() {
     Scroll() {
       Row() {
         ForEach(this.filters, (f: RecipeFilter) => {
           Text(f.label)
-            .fontSize(StyleConstants.FONT_MD)
-            .fontColor(this.currentFilter === f.id ? StyleConstants.TEXT_WHITE : StyleConstants.TEXT_SUB)
+            .fontSize(this.t().fontMd)
+            .fontColor(this.currentFilter === f.id ? this.t().textOnPrimary : this.t().textSub)
             .padding({ left: 14, right: 14, top: 6, bottom: 6 })
-            .backgroundColor(this.currentFilter === f.id ? StyleConstants.ACCENT : StyleConstants.BG_CARD)
-            .borderRadius(StyleConstants.RADIUS_SM)
+            .backgroundColor(this.currentFilter === f.id ? this.t().primary : this.t().bgCard)
+            .borderRadius(this.t().radiusSm)
             .margin({ right: 8 })
-            .onClick(() => {
-              this.currentFilter = f.id;
-            })
+            .onClick(() => { this.currentFilter = f.id; })
         })
       }
       .padding({ left: this.getPagePadding(), right: this.getPagePadding() })
@@ -179,6 +171,7 @@ export struct RecipePage {
     .padding({ top: 12, bottom: 4 })
   }
 
+  // ==================== 配方列表 ====================
   @Builder
   RecipeList() {
     Scroll() {
@@ -196,11 +189,7 @@ export struct RecipePage {
         Blank().height(80)
       }
       .width('100%')
-      .padding({
-        left: this.getPagePadding(),
-        right: this.getPagePadding(),
-        top: 8
-      })
+      .padding({ left: this.getPagePadding(), right: this.getPagePadding(), top: 8 })
     }
     .layoutWeight(1)
     .scrollBar(BarState.Auto)
@@ -209,63 +198,53 @@ export struct RecipePage {
   @Builder
   RecipeCard(item: Recipe) {
     Column() {
-      // 头部：品种 + 阶段 + 自定义标记
       Row() {
         Text(item.mushroomType)
-          .fontSize(StyleConstants.FONT_MD)
-          .fontColor(StyleConstants.TEXT_WHITE)
+          .fontSize(this.t().fontMd)
+          .fontColor(this.t().textOnPrimary)
           .fontWeight(FontWeight.Bold)
           .padding({ left: 8, right: 8, top: 4, bottom: 4 })
           .backgroundColor(this.getTypeColor(item.mushroomType))
           .borderRadius(6)
         Text(item.growthStage)
-          .fontSize(StyleConstants.FONT_SM)
+          .fontSize(this.t().fontSm)
           .fontColor(this.getStageColor(item.growthStage))
           .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-          .backgroundColor(this.getStageColor(item.growthStage) + '20')
+          .backgroundColor(this.t().bgCardLight)
           .borderRadius(6)
           .margin({ left: 8 })
         Blank()
         if (item.isCustom) {
           Text('自定义')
-            .fontSize(StyleConstants.FONT_XS)
-            .fontColor(StyleConstants.WARNING)
+            .fontSize(this.t().fontXs)
+            .fontColor(this.t().warning)
             .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-            .border({ width: 1, color: StyleConstants.WARNING })
+            .border({ width: 1, color: this.t().warning })
             .borderRadius(4)
         }
       }
       .width('100%')
 
-      // 说明
       Text(item.description)
-        .fontSize(StyleConstants.FONT_SM)
-        .fontColor(StyleConstants.TEXT_SUB)
+        .fontSize(this.t().fontSm)
+        .fontColor(this.t().textSub)
         .margin({ top: 8 })
         .width('100%')
 
       // 参数 2x2 grid
       Row() {
-        Column() {
-          this.ParamRow('温度', `${item.tempMin}~${item.tempMax}°C`, StyleConstants.COLOR_TEMP)
-        }
+        Column() { this.ParamRow('温度', `${item.tempMin}~${item.tempMax}°C`, this.t().colorTemp) }
         .layoutWeight(1)
-        Column() {
-          this.ParamRow('湿度', `${item.humidityMin}~${item.humidityMax}%`, StyleConstants.COLOR_HUMIDITY)
-        }
+        Column() { this.ParamRow('湿度', `${item.humidityMin}~${item.humidityMax}%`, this.t().colorHumidity) }
         .layoutWeight(1)
       }
       .width('100%')
       .margin({ top: 12 })
 
       Row() {
-        Column() {
-          this.ParamRow('CO₂', `≤${item.co2Max}ppm`, StyleConstants.COLOR_CO2)
-        }
+        Column() { this.ParamRow('CO₂', `≤${item.co2Max}ppm`, this.t().colorCo2) }
         .layoutWeight(1)
-        Column() {
-          this.ParamRow('光照', `${item.lightMin}~${item.lightMax}lux`, StyleConstants.COLOR_LIGHT)
-        }
+        Column() { this.ParamRow('光照', `${item.lightMin}~${item.lightMax}lux`, this.t().colorLight) }
         .layoutWeight(1)
       }
       .width('100%')
@@ -275,26 +254,22 @@ export struct RecipePage {
       Row() {
         if (item.isCustom) {
           Text('删除')
-            .fontSize(StyleConstants.FONT_MD)
-            .fontColor(StyleConstants.DANGER)
+            .fontSize(this.t().fontMd)
+            .fontColor(this.t().danger)
             .padding({ left: 16, right: 16, top: 8, bottom: 8 })
-            .border({ width: 1, color: StyleConstants.DANGER })
-            .borderRadius(StyleConstants.RADIUS_SM)
-            .onClick(() => {
-              this.deleteRecipe(item.id);
-            })
+            .border({ width: 1, color: this.t().danger })
+            .borderRadius(this.t().radiusSm)
+            .onClick(() => { this.deleteRecipe(item.id); })
         }
         Blank()
         Text(this.appliedRecipeId === item.id ? '已应用 ✓' : '应用到设备')
-          .fontSize(StyleConstants.FONT_MD)
-          .fontColor(this.appliedRecipeId === item.id ? StyleConstants.TEXT_HINT : StyleConstants.TEXT_WHITE)
+          .fontSize(this.t().fontMd)
+          .fontColor(this.appliedRecipeId === item.id ? this.t().textSub : this.t().textOnPrimary)
           .padding({ left: 16, right: 16, top: 8, bottom: 8 })
-          .backgroundColor(this.appliedRecipeId === item.id ? StyleConstants.BORDER_LIGHT : StyleConstants.SUCCESS)
-          .borderRadius(StyleConstants.RADIUS_SM)
+          .backgroundColor(this.appliedRecipeId === item.id ? this.t().bgCardLight : this.t().primary)
+          .borderRadius(this.t().radiusSm)
           .onClick(() => {
-            if (this.appliedRecipeId !== item.id) {
-              this.applyRecipe(item);
-            }
+            if (this.appliedRecipeId !== item.id) { this.applyRecipe(item); }
           })
       }
       .width('100%')
@@ -302,32 +277,34 @@ export struct RecipePage {
     }
     .width('100%')
     .padding(14)
-    .backgroundColor(StyleConstants.BG_CARD)
-    .borderRadius(StyleConstants.RADIUS_MD)
+    .backgroundColor(this.t().bgCard)
+    .backdropBlur(this.t().blurAmount)
+    .border({ width: 1, color: this.t().border })
+    .borderRadius(this.t().radiusMd)
     .shadow({
-      radius: 4,
-      color: '#0A000000',
+      radius: this.t().shadowCardRadius,
+      color: this.t().shadowCardColor,
       offsetX: 0,
-      offsetY: 1
+      offsetY: this.t().shadowCardOffsetY
     })
   }
 
   @Builder
-  ParamRow(label: string, value: string, color: string) {
+  ParamRow(label: string, value: string, accentColor: string) {
     Row() {
       Column()
         .width(3)
         .height(20)
-        .backgroundColor(color)
+        .backgroundColor(accentColor)  // 传感器色仅供装饰（色条），不做文字色
         .borderRadius(2)
         .margin({ right: 8 })
       Column() {
         Text(label)
-          .fontSize(StyleConstants.FONT_XS)
-          .fontColor(StyleConstants.TEXT_HINT)
+          .fontSize(this.t().fontXs)
+          .fontColor(this.t().textSub)
         Text(value)
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(StyleConstants.TEXT_TITLE)
+          .fontSize(this.t().fontSm)
+          .fontColor(this.t().textTitle)
           .fontWeight(FontWeight.Medium)
           .margin({ top: 2 })
       }
@@ -338,28 +315,23 @@ export struct RecipePage {
     .alignItems(VerticalAlign.Center)
   }
 
+  // ==================== 新建表单 ====================
   @Builder
   AddForm() {
     Scroll() {
       Column() {
         Text('新建自定义配方')
-          .fontSize(StyleConstants.FONT_LG)
-          .fontColor(StyleConstants.TEXT_TITLE)
+          .fontSize(this.t().fontLg)
+          .fontColor(this.t().textTitle)
           .fontWeight(FontWeight.Bold)
           .margin({ bottom: 16 })
           .width('100%')
 
-        // 品种选择
         Column() {
           Text('蘑菇品种')
-            .fontSize(StyleConstants.FONT_SM)
-            .fontColor(StyleConstants.TEXT_SUB)
-            .width('100%')
+            .fontSize(this.t().fontSm).fontColor(this.t().textSub).width('100%')
           Select([
-            { value: '平菇' },
-            { value: '香菇' },
-            { value: '金针菇' },
-            { value: '杏鲍菇' }
+            { value: '平菇' }, { value: '香菇' }, { value: '金针菇' }, { value: '杏鲍菇' }
           ])
             .selected(this.getFormTypeIndex())
             .value(this.formMushroomType)
@@ -367,23 +339,15 @@ export struct RecipePage {
               const types: string[] = ['平菇', '香菇', '金针菇', '杏鲍菇'];
               this.formMushroomType = types[index];
             })
-            .margin({ top: 6 })
-            .width('100%')
+            .margin({ top: 6 }).width('100%')
         }
-        .width('100%')
-        .margin({ bottom: 12 })
+        .width('100%').margin({ bottom: 12 })
 
-        // 生长阶段
         Column() {
           Text('生长阶段')
-            .fontSize(StyleConstants.FONT_SM)
-            .fontColor(StyleConstants.TEXT_SUB)
-            .width('100%')
+            .fontSize(this.t().fontSm).fontColor(this.t().textSub).width('100%')
           Select([
-            { value: '菌丝期' },
-            { value: '原基期' },
-            { value: '子实体期' },
-            { value: '采收期' }
+            { value: '菌丝期' }, { value: '原基期' }, { value: '子实体期' }, { value: '采收期' }
           ])
             .selected(this.getFormStageIndex())
             .value(this.formGrowthStage)
@@ -391,245 +355,155 @@ export struct RecipePage {
               const stages: string[] = ['菌丝期', '原基期', '子实体期', '采收期'];
               this.formGrowthStage = stages[index];
             })
-            .margin({ top: 6 })
-            .width('100%')
+            .margin({ top: 6 }).width('100%')
         }
-        .width('100%')
-        .margin({ bottom: 12 })
+        .width('100%').margin({ bottom: 12 })
 
         // 温度范围
         Row() {
           Column() {
-            Text('温度最小值 (°C)')
-              .fontSize(StyleConstants.FONT_SM)
-              .fontColor(StyleConstants.TEXT_SUB)
-              .width('100%')
+            Text('温度最小值 (°C)').fontSize(this.t().fontSm).fontColor(this.t().textSub).width('100%')
             TextInput({ text: this.formTempMin.toString() })
               .type(InputType.Number)
-              .onChange((value: string) => {
-                if (value.length > 0) {
-                  this.formTempMin = Number(value);
-                }
-              })
+              .onChange((value: string) => { if (value.length > 0) { this.formTempMin = Number(value); } })
               .margin({ top: 6 })
-              .backgroundColor(StyleConstants.BG_CARD_LIGHT)
-              .borderRadius(StyleConstants.RADIUS_SM)
-          }
-          .layoutWeight(1)
+              .backgroundColor(this.t().bgCardLight).borderRadius(this.t().radiusSm)
+          }.layoutWeight(1)
           Column() {
-            Text('温度最大值 (°C)')
-              .fontSize(StyleConstants.FONT_SM)
-              .fontColor(StyleConstants.TEXT_SUB)
-              .width('100%')
+            Text('温度最大值 (°C)').fontSize(this.t().fontSm).fontColor(this.t().textSub).width('100%')
             TextInput({ text: this.formTempMax.toString() })
               .type(InputType.Number)
-              .onChange((value: string) => {
-                if (value.length > 0) {
-                  this.formTempMax = Number(value);
-                }
-              })
+              .onChange((value: string) => { if (value.length > 0) { this.formTempMax = Number(value); } })
               .margin({ top: 6 })
-              .backgroundColor(StyleConstants.BG_CARD_LIGHT)
-              .borderRadius(StyleConstants.RADIUS_SM)
-          }
-          .layoutWeight(1)
+              .backgroundColor(this.t().bgCardLight).borderRadius(this.t().radiusSm)
+          }.layoutWeight(1)
         }
-        .width('100%')
-        .margin({ bottom: 12 })
+        .width('100%').margin({ bottom: 12 })
 
         // 湿度范围
         Row() {
           Column() {
-            Text('湿度最小值 (%)')
-              .fontSize(StyleConstants.FONT_SM)
-              .fontColor(StyleConstants.TEXT_SUB)
-              .width('100%')
+            Text('湿度最小值 (%)').fontSize(this.t().fontSm).fontColor(this.t().textSub).width('100%')
             TextInput({ text: this.formHumidityMin.toString() })
               .type(InputType.Number)
-              .onChange((value: string) => {
-                if (value.length > 0) {
-                  this.formHumidityMin = Number(value);
-                }
-              })
+              .onChange((value: string) => { if (value.length > 0) { this.formHumidityMin = Number(value); } })
               .margin({ top: 6 })
-              .backgroundColor(StyleConstants.BG_CARD_LIGHT)
-              .borderRadius(StyleConstants.RADIUS_SM)
-          }
-          .layoutWeight(1)
+              .backgroundColor(this.t().bgCardLight).borderRadius(this.t().radiusSm)
+          }.layoutWeight(1)
           Column() {
-            Text('湿度最大值 (%)')
-              .fontSize(StyleConstants.FONT_SM)
-              .fontColor(StyleConstants.TEXT_SUB)
-              .width('100%')
+            Text('湿度最大值 (%)').fontSize(this.t().fontSm).fontColor(this.t().textSub).width('100%')
             TextInput({ text: this.formHumidityMax.toString() })
               .type(InputType.Number)
-              .onChange((value: string) => {
-                if (value.length > 0) {
-                  this.formHumidityMax = Number(value);
-                }
-              })
+              .onChange((value: string) => { if (value.length > 0) { this.formHumidityMax = Number(value); } })
               .margin({ top: 6 })
-              .backgroundColor(StyleConstants.BG_CARD_LIGHT)
-              .borderRadius(StyleConstants.RADIUS_SM)
-          }
-          .layoutWeight(1)
+              .backgroundColor(this.t().bgCardLight).borderRadius(this.t().radiusSm)
+          }.layoutWeight(1)
         }
-        .width('100%')
-        .margin({ bottom: 12 })
+        .width('100%').margin({ bottom: 12 })
 
         // CO2 上限
         Column() {
-          Text('CO₂上限 (ppm)')
-            .fontSize(StyleConstants.FONT_SM)
-            .fontColor(StyleConstants.TEXT_SUB)
-            .width('100%')
+          Text('CO₂上限 (ppm)').fontSize(this.t().fontSm).fontColor(this.t().textSub).width('100%')
           TextInput({ text: this.formCo2Max.toString() })
             .type(InputType.Number)
-            .onChange((value: string) => {
-              if (value.length > 0) {
-                this.formCo2Max = Number(value);
-              }
-            })
+            .onChange((value: string) => { if (value.length > 0) { this.formCo2Max = Number(value); } })
             .margin({ top: 6 })
-            .backgroundColor(StyleConstants.BG_CARD_LIGHT)
-            .borderRadius(StyleConstants.RADIUS_SM)
+            .backgroundColor(this.t().bgCardLight).borderRadius(this.t().radiusSm)
         }
-        .width('100%')
-        .margin({ bottom: 12 })
+        .width('100%').margin({ bottom: 12 })
 
         // 光照范围
         Row() {
           Column() {
-            Text('光照最小值 (lux)')
-              .fontSize(StyleConstants.FONT_SM)
-              .fontColor(StyleConstants.TEXT_SUB)
-              .width('100%')
+            Text('光照最小值 (lux)').fontSize(this.t().fontSm).fontColor(this.t().textSub).width('100%')
             TextInput({ text: this.formLightMin.toString() })
               .type(InputType.Number)
-              .onChange((value: string) => {
-                if (value.length > 0) {
-                  this.formLightMin = Number(value);
-                }
-              })
+              .onChange((value: string) => { if (value.length > 0) { this.formLightMin = Number(value); } })
               .margin({ top: 6 })
-              .backgroundColor(StyleConstants.BG_CARD_LIGHT)
-              .borderRadius(StyleConstants.RADIUS_SM)
-          }
-          .layoutWeight(1)
+              .backgroundColor(this.t().bgCardLight).borderRadius(this.t().radiusSm)
+          }.layoutWeight(1)
           Column() {
-            Text('光照最大值 (lux)')
-              .fontSize(StyleConstants.FONT_SM)
-              .fontColor(StyleConstants.TEXT_SUB)
-              .width('100%')
+            Text('光照最大值 (lux)').fontSize(this.t().fontSm).fontColor(this.t().textSub).width('100%')
             TextInput({ text: this.formLightMax.toString() })
               .type(InputType.Number)
-              .onChange((value: string) => {
-                if (value.length > 0) {
-                  this.formLightMax = Number(value);
-                }
-              })
+              .onChange((value: string) => { if (value.length > 0) { this.formLightMax = Number(value); } })
               .margin({ top: 6 })
-              .backgroundColor(StyleConstants.BG_CARD_LIGHT)
-              .borderRadius(StyleConstants.RADIUS_SM)
-          }
-          .layoutWeight(1)
+              .backgroundColor(this.t().bgCardLight).borderRadius(this.t().radiusSm)
+          }.layoutWeight(1)
         }
-        .width('100%')
-        .margin({ bottom: 12 })
+        .width('100%').margin({ bottom: 12 })
 
         // 说明
         Column() {
-          Text('配方说明')
-            .fontSize(StyleConstants.FONT_SM)
-            .fontColor(StyleConstants.TEXT_SUB)
-            .width('100%')
+          Text('配方说明').fontSize(this.t().fontSm).fontColor(this.t().textSub).width('100%')
           TextInput({ text: this.formDescription, placeholder: '可选，描述配方特点' })
-            .onChange((value: string) => {
-              this.formDescription = value;
-            })
+            .onChange((value: string) => { this.formDescription = value; })
             .margin({ top: 6 })
-            .backgroundColor(StyleConstants.BG_CARD_LIGHT)
-            .borderRadius(StyleConstants.RADIUS_SM)
+            .backgroundColor(this.t().bgCardLight).borderRadius(this.t().radiusSm)
         }
-        .width('100%')
-        .margin({ bottom: 20 })
+        .width('100%').margin({ bottom: 20 })
 
         // 操作按钮
         Row() {
           Text('取消')
-            .fontSize(StyleConstants.FONT_MD)
-            .fontColor(StyleConstants.TEXT_SUB)
-            .layoutWeight(1)
-            .textAlign(TextAlign.Center)
+            .fontSize(this.t().fontMd).fontColor(this.t().textSub)
+            .layoutWeight(1).textAlign(TextAlign.Center)
             .padding({ top: 10, bottom: 10 })
-            .backgroundColor(StyleConstants.BG_CARD_LIGHT)
-            .borderRadius(StyleConstants.RADIUS_SM)
-            .onClick(() => {
-              this.showAddForm = false;
-              this.resetForm();
-            })
+            .backgroundColor(this.t().bgCardLight).borderRadius(this.t().radiusSm)
+            .onClick(() => { this.showAddForm = false; this.resetForm(); })
           Blank().width(12)
           Text('保存')
-            .fontSize(StyleConstants.FONT_MD)
-            .fontColor(StyleConstants.TEXT_WHITE)
-            .layoutWeight(1)
-            .textAlign(TextAlign.Center)
+            .fontSize(this.t().fontMd).fontColor(this.t().textOnPrimary)
+            .layoutWeight(1).textAlign(TextAlign.Center)
             .padding({ top: 10, bottom: 10 })
-            .backgroundColor(StyleConstants.ACCENT)
-            .borderRadius(StyleConstants.RADIUS_SM)
-            .onClick(() => {
-              this.addCustomRecipe();
-            })
+            .backgroundColor(this.t().primary).borderRadius(this.t().radiusSm)
+            .onClick(() => { this.addCustomRecipe(); })
         }
         .width('100%')
 
         Blank().height(40)
       }
-      .width('100%')
-      .padding(16)
+      .width('100%').padding(16)
     }
-    .layoutWeight(1)
-    .scrollBar(BarState.Auto)
+    .layoutWeight(1).scrollBar(BarState.Auto)
   }
 
   // ==================== 私有方法 ====================
 
   private getFilteredRecipes(): Recipe[] {
-    if (this.currentFilter === 'all') {
-      return this.recipes;
-    }
+    if (this.currentFilter === 'all') { return this.recipes; }
     return this.recipes.filter((r: Recipe) => r.mushroomType === this.currentFilter);
   }
 
   private getStageColor(stage: string): string {
-    if (stage === '菌丝期') return StyleConstants.INFO;
-    if (stage === '原基期') return StyleConstants.WARNING;
-    if (stage === '子实体期') return StyleConstants.SUCCESS;
-    if (stage === '采收期') return StyleConstants.PURPLE;
-    return StyleConstants.TEXT_HINT;
+    if (stage === '菌丝期') { return this.t().info; }
+    if (stage === '原基期') { return this.t().warning; }
+    if (stage === '子实体期') { return this.t().success; }
+    if (stage === '采收期') { return this.t().purple; }
+    return this.t().textSub;
   }
 
   private getTypeColor(type: string): string {
-    if (type === '平菇') return StyleConstants.PRIMARY;
-    if (type === '香菇') return StyleConstants.ACCENT;
-    if (type === '金针菇') return StyleConstants.INFO;
-    if (type === '杏鲍菇') return StyleConstants.PURPLE;
-    return StyleConstants.PRIMARY;
+    if (type === '平菇') { return this.t().primary; }
+    if (type === '香菇') { return this.t().accent; }
+    if (type === '金针菇') { return this.t().info; }
+    if (type === '杏鲍菇') { return this.t().purple; }
+    return this.t().primary;
   }
 
   private getFormTypeIndex(): number {
-    if (this.formMushroomType === '平菇') return 0;
-    if (this.formMushroomType === '香菇') return 1;
-    if (this.formMushroomType === '金针菇') return 2;
-    if (this.formMushroomType === '杏鲍菇') return 3;
+    if (this.formMushroomType === '平菇') { return 0; }
+    if (this.formMushroomType === '香菇') { return 1; }
+    if (this.formMushroomType === '金针菇') { return 2; }
+    if (this.formMushroomType === '杏鲍菇') { return 3; }
     return 0;
   }
 
   private getFormStageIndex(): number {
-    if (this.formGrowthStage === '菌丝期') return 0;
-    if (this.formGrowthStage === '原基期') return 1;
-    if (this.formGrowthStage === '子实体期') return 2;
-    if (this.formGrowthStage === '采收期') return 3;
+    if (this.formGrowthStage === '菌丝期') { return 0; }
+    if (this.formGrowthStage === '原基期') { return 1; }
+    if (this.formGrowthStage === '子实体期') { return 2; }
+    if (this.formGrowthStage === '采收期') { return 3; }
     return 0;
   }
 
@@ -646,8 +520,7 @@ export struct RecipePage {
       };
       await IotService.getInstance().sendCommand('recipe_service', 'apply_recipe', props);
       this.appliedRecipeId = recipe.id;
-    } catch (err) {
-      // 失败也标记为已应用（mock 模式）
+    } catch {
       this.appliedRecipeId = recipe.id;
     }
   }
@@ -674,9 +547,7 @@ export struct RecipePage {
 
   private deleteRecipe(id: string): void {
     this.recipes = this.recipes.filter((r: Recipe) => r.id !== id);
-    if (this.appliedRecipeId === id) {
-      this.appliedRecipeId = '';
-    }
+    if (this.appliedRecipeId === id) { this.appliedRecipeId = ''; }
   }
 
   private resetForm(): void {

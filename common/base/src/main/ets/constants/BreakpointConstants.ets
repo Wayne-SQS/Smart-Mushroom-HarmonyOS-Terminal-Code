@@ -170,4 +170,21 @@ export class AdaptiveUtils {
       default: return 20;
     }
   }
+
+  /**
+   * 根据断点获取概览卡片数字字号（比传感器数据更大一级）
+   *
+   * 大字号场景专用：概览数字（在线设备/今日采收/在培批次）。
+   * 不走 ThemeTokens.fontXxl，避免手机端字号过大。
+   */
+  static getOverviewFontSize(breakpoint: string): number {
+    switch (breakpoint) {
+      case BreakpointConstants.XS: return 20;
+      case BreakpointConstants.SM: return 24;
+      case BreakpointConstants.MD: return 28;
+      case BreakpointConstants.LG: return 32;
+      case BreakpointConstants.XL: return 36;
+      default: return 24;
+    }
+  }
 }

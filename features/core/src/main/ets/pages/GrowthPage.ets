@@ -1,18 +1,15 @@
-import { StyleConstants } from 'common-base';
+import { ThemeManager } from '../theme/ThemeManager';
+import { ThemeTokens } from '../theme/ThemeTokens';
 import { GrowthBatch } from '../model/GreenhouseModel';
 
 /**
- * 蘑菇生长日记页面（特色功能）
- *
- * 功能：
- * 1. 在培批次列表（时间线展示）
- * 2. 生长阶段标记
- * 3. 采收记录
- * 4. 预计采收时间
+ * 蘑菇生长日记页面 - 主题驱动
  */
 
 @Component
 export struct GrowthPage {
+  @StorageLink('themeName') themeName: string = 'frosted';
+
   @State batches: GrowthBatch[] = [
     { id: '1', mushroomType: '平菇', startDate: '2026-05-20', day: 20, status: '采收中', yield: '12.5kg' },
     { id: '2', mushroomType: '香菇', startDate: '2026-05-28', day: 12, status: '菌丝生长期', yield: '-' },
@@ -23,6 +20,10 @@ export struct GrowthPage {
   @State currentBatches: number = 3;
   @State harvestedBatches: number = 7;
 
+  t(): ThemeTokens {
+    return ThemeManager.getInstance().getTokens();
+  }
+
   build() {
     Column() {
       this.HeaderSection()
@@ -31,28 +32,28 @@ export struct GrowthPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(StyleConstants.BG_PAGE)
+    .backgroundColor(this.t().bgPage)
   }
 
   @Builder
   HeaderSection() {
     Row() {
       Text('生长日记')
-        .fontSize(StyleConstants.FONT_XXL)
-        .fontColor(StyleConstants.TEXT_WHITE)
+        .fontSize(this.t().fontXxl)
+        .fontColor(this.t().textWhite)
         .fontWeight(FontWeight.Bold)
       Blank()
       Text('+ 新建')
-        .fontSize(StyleConstants.FONT_MD)
-        .fontColor(StyleConstants.TEXT_WHITE)
+        .fontSize(this.t().fontMd)
+        .fontColor(this.t().textWhite)
         .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-        .backgroundColor('#FFFFFF20')
-        .borderRadius(StyleConstants.RADIUS_SM)
+        .backgroundColor(this.t().bgCardLight)
+        .borderRadius(this.t().radiusSm)
     }
     .width('100%')
     .height(56)
     .padding({ left: 16, right: 16 })
-    .backgroundColor(StyleConstants.ACCENT)
+    .backgroundColor(this.t().primary)
   }
 
   @Builder
@@ -60,57 +61,56 @@ export struct GrowthPage {
     Row() {
       Column() {
         Text(this.totalYield)
-          .fontSize(StyleConstants.FONT_XL)
-          .fontColor(StyleConstants.ACCENT)
+          .fontSize(this.t().fontXl)
+          .fontColor(this.t().accent)
           .fontWeight(FontWeight.Bold)
         Text('累计产量')
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(StyleConstants.TEXT_SUB)
+          .fontSize(this.t().fontSm)
+          .fontColor(this.t().textSub)
           .margin({ top: 2 })
       }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Center)
+      .layoutWeight(1).alignItems(HorizontalAlign.Center)
 
-      Divider().vertical(true).height(32).color(StyleConstants.BORDER_LIGHT)
+      Divider().vertical(true).height(32).color(this.t().borderLight)
 
       Column() {
         Text(this.currentBatches.toString())
-          .fontSize(StyleConstants.FONT_XL)
-          .fontColor(StyleConstants.PRIMARY)
+          .fontSize(this.t().fontXl)
+          .fontColor(this.t().primary)
           .fontWeight(FontWeight.Bold)
         Text('在培批次')
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(StyleConstants.TEXT_SUB)
+          .fontSize(this.t().fontSm)
+          .fontColor(this.t().textSub)
           .margin({ top: 2 })
       }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Center)
+      .layoutWeight(1).alignItems(HorizontalAlign.Center)
 
-      Divider().vertical(true).height(32).color(StyleConstants.BORDER_LIGHT)
+      Divider().vertical(true).height(32).color(this.t().borderLight)
 
       Column() {
         Text(this.harvestedBatches.toString())
-          .fontSize(StyleConstants.FONT_XL)
-          .fontColor(StyleConstants.INFO)
+          .fontSize(this.t().fontXl)
+          .fontColor(this.t().info)
           .fontWeight(FontWeight.Bold)
         Text('已采收')
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(StyleConstants.TEXT_SUB)
+          .fontSize(this.t().fontSm)
+          .fontColor(this.t().textSub)
           .margin({ top: 2 })
       }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Center)
+      .layoutWeight(1).alignItems(HorizontalAlign.Center)
     }
     .width('100%')
     .padding({ top: 16, bottom: 16 })
-    .backgroundColor(StyleConstants.BG_CARD)
-    .borderRadius(StyleConstants.RADIUS_LG)
+    .backgroundColor(this.t().bgCard)
+    .backdropBlur(this.t().blurAmount)
+    .border({ width: 1, color: this.t().border })
+    .borderRadius(this.t().radiusLg)
     .margin({ top: 12, left: 12, right: 12 })
     .shadow({
-      radius: StyleConstants.SHADOW_CARD_RADIUS,
-      color: StyleConstants.SHADOW_CARD_COLOR,
+      radius: this.t().shadowCardRadius,
+      color: this.t().shadowCardColor,
       offsetX: 0,
-      offsetY: StyleConstants.SHADOW_CARD_OFFSETY
+      offsetY: this.t().shadowCardOffsetY
     })
   }
 
@@ -119,8 +119,8 @@ export struct GrowthPage {
     Scroll() {
       Column() {
         Text('在培批次')
-          .fontSize(StyleConstants.FONT_LG)
-          .fontColor(StyleConstants.TEXT_TITLE)
+          .fontSize(this.t().fontLg)
+          .fontColor(this.t().textTitle)
           .fontWeight(FontWeight.Bold)
           .margin({ bottom: 12 })
 
@@ -140,35 +140,34 @@ export struct GrowthPage {
   @Builder
   BatchCard(item: GrowthBatch, isLast: boolean) {
     Row() {
-      // 时间线
+      // 时间线圆点
       Column() {
         Circle({ width: 12, height: 12 })
           .fill(this.getStatusColor(item.status))
-          .border({ width: 3, color: '#FFFFFF' })
+          .border({ width: 3, color: this.t().bgCard })
         if (!isLast) {
           Column()
             .width(2)
             .layoutWeight(1)
-            .backgroundColor(StyleConstants.BORDER_LIGHT)
+            .backgroundColor(this.t().borderLight)
             .margin({ top: 4 })
         }
       }
       .width(20)
       .height('100%')
 
-      // 卡片内容
       Column() {
         Row() {
           Text(item.mushroomType)
-            .fontSize(StyleConstants.FONT_LG)
-            .fontColor(StyleConstants.TEXT_TITLE)
+            .fontSize(this.t().fontLg)
+            .fontColor(this.t().textTitle)
             .fontWeight(FontWeight.Bold)
           Blank()
           Text(item.status)
-            .fontSize(StyleConstants.FONT_XS)
+            .fontSize(this.t().fontXs)
             .fontColor(this.getStatusColor(item.status))
             .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-            .backgroundColor(this.getStatusColor(item.status) + '20')
+            .backgroundColor(this.t().bgCardLight)
             .borderRadius(4)
         }
         .width('100%')
@@ -176,12 +175,12 @@ export struct GrowthPage {
         Row() {
           Column() {
             Text(`第${item.day}天`)
-              .fontSize(StyleConstants.FONT_MD)
-              .fontColor(StyleConstants.TEXT_BODY)
+              .fontSize(this.t().fontMd)
+              .fontColor(this.t().textBody)
               .fontWeight(FontWeight.Medium)
             Text(`开始: ${item.startDate}`)
-              .fontSize(StyleConstants.FONT_XS)
-              .fontColor(StyleConstants.TEXT_HINT)
+              .fontSize(this.t().fontXs)
+              .fontColor(this.t().textSub)
               .margin({ top: 4 })
           }
           .alignItems(HorizontalAlign.Start)
@@ -191,19 +190,19 @@ export struct GrowthPage {
           Column() {
             if (item.yield !== '-') {
               Text(item.yield)
-                .fontSize(StyleConstants.FONT_LG)
-                .fontColor(StyleConstants.SUCCESS)
+                .fontSize(this.t().fontLg)
+                .fontColor(this.t().success)
                 .fontWeight(FontWeight.Bold)
               Text('产量')
-                .fontSize(StyleConstants.FONT_XS)
-                .fontColor(StyleConstants.TEXT_HINT)
+                .fontSize(this.t().fontXs)
+                .fontColor(this.t().textSub)
             } else {
               Text(this.getExpectedHarvest(item.day))
-                .fontSize(StyleConstants.FONT_SM)
-                .fontColor(StyleConstants.WARNING)
+                .fontSize(this.t().fontSm)
+                .fontColor(this.t().warning)
               Text('预计采收')
-                .fontSize(StyleConstants.FONT_XS)
-                .fontColor(StyleConstants.TEXT_HINT)
+                .fontSize(this.t().fontXs)
+                .fontColor(this.t().textSub)
                 .margin({ top: 2 })
             }
           }
@@ -222,7 +221,7 @@ export struct GrowthPage {
           Column()
             .layoutWeight(Math.max(1 - item.day / 30, 0.01))
             .height(4)
-            .backgroundColor(StyleConstants.BORDER_LIGHT)
+            .backgroundColor(this.t().borderLight)
             .borderRadius(2)
         }
         .width('100%')
@@ -231,13 +230,15 @@ export struct GrowthPage {
       .layoutWeight(1)
       .margin({ left: 12 })
       .padding(14)
-      .backgroundColor(StyleConstants.BG_CARD)
-      .borderRadius(StyleConstants.RADIUS_MD)
+      .backgroundColor(this.t().bgCard)
+      .backdropBlur(this.t().blurAmount)
+      .border({ width: 1, color: this.t().border })
+      .borderRadius(this.t().radiusMd)
       .shadow({
-        radius: 4,
-        color: '#0A000000',
+        radius: this.t().shadowCardRadius,
+        color: this.t().shadowCardColor,
         offsetX: 0,
-        offsetY: 1
+        offsetY: this.t().shadowCardOffsetY
       })
     }
     .width('100%')
@@ -245,20 +246,14 @@ export struct GrowthPage {
   }
 
   private getStatusColor(status: string): string {
-    if (status === '采收中') {
-      return StyleConstants.SUCCESS;
-    }
-    if (status === '原基形成期') {
-      return StyleConstants.WARNING;
-    }
-    return StyleConstants.INFO;
+    if (status === '采收中') { return this.t().success; }
+    if (status === '原基形成期') { return this.t().warning; }
+    return this.t().info;
   }
 
   private getExpectedHarvest(currentDay: number): string {
     const remaining = 30 - currentDay;
-    if (remaining <= 0) {
-      return '可采收';
-    }
+    if (remaining <= 0) { return '可采收'; }
     return `${remaining}天后`;
   }
 }

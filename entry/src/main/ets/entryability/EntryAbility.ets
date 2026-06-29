@@ -1,15 +1,17 @@
 import { AbilityConstant, ConfigurationConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
-import { IotService } from 'features-core';
+import { IotService, ThemeManager } from 'features-core';
 import { IOT_CONFIG } from './IotConfig';
 
 const DOMAIN = 0x0000;
 
 export default class EntryAbility extends UIAbility {
-  onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+  async onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): Promise<void> {
+    // 锁定浅色模式：双主题（雾透/黑白）均在浅色底色上设计，
+    // 跟随系统深色会导致淡彩 token 被系统反转 → 发黄
     try {
-      this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_NOT_SET);
+      this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_LIGHT);
     } catch (err) {
       hilog.error(DOMAIN, 'testTag', 'Failed to set colorMode. Cause: %{public}s', JSON.stringify(err));
     }
@@ -20,6 +22,16 @@ export default class EntryAbility extends UIAbility {
       hilog.info(DOMAIN, 'testTag', '%{public}s', 'IoT service initialized');
     } catch (err) {
       hilog.error(DOMAIN, 'testTag', 'Failed to init IoT service. Cause: %{public}s', JSON.stringify(err));
+    }
+
+    // 主题初始化（同步）：
+    // PersistentStorage.persistProp 在构造函数自动从磁盘恢复 → AppStorage
+    // init() 仅同步 current 字段到 ThemeManager
+    try {
+      ThemeManager.getInstance().init();
+      hilog.info(DOMAIN, 'testTag', '%{public}s', 'Theme manager initialized');
+    } catch (err) {
+      hilog.error(DOMAIN, 'testTag', 'Failed to init theme manager. Cause: %{public}s', JSON.stringify(err));
     }
 
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');

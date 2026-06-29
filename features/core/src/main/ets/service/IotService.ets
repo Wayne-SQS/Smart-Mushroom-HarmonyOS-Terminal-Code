@@ -53,8 +53,8 @@ class SetVentParas {
 class CommandBody {
   service_id: string;
   command_name: string;
-  paras: Record<string, Object>;
-  constructor(serviceId: string, commandName: string, paras: Record<string, Object>) {
+  paras: Object;
+  constructor(serviceId: string, commandName: string, paras: Object) {
     this.service_id = serviceId;
     this.command_name = commandName;
     this.paras = paras;
@@ -219,7 +219,7 @@ export class IotService {
   async sendCommand(
     serviceId: string,
     commandName: string,
-    paras: Record<string, Object>
+    paras: Object
   ): Promise<AppSideCommandResponse> {
     await this.ensureAuthenticated();
 

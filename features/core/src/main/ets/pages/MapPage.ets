@@ -1,18 +1,9 @@
-import { StyleConstants } from 'common-base';
+import { ThemeManager } from '../theme/ThemeManager';
+import { ThemeTokens } from '../theme/ThemeTokens';
 
 /**
- * 地图监控页面
- *
- * 展示大棚在地图上的位置分布与交互
- * 后续集成 HMS Map Kit 实现真实地图
- * 当前为占位UI，预留地图接入点
- *
- * 交互能力：
- * 1. 顶部搜索栏过滤大棚名称
- * 2. 顶部统计条（总数/在线/告警/传感器总数）
- * 3. 占位地图：网格坐标系 + 大棚标记 + 选中态光环动画 + 比例尺
- * 4. 点击标记或列表卡片 → 同步 selectedId → 浮层详情卡片
- * 5. 详情卡片：名称/状态徽章 + 传感器/告警/设备 + 温湿度 2x2 mini grid + 查看详情按钮
+ * 地图监控页面 - 主题驱动
+ * 当前为占位地图，后续集成 HMS Map Kit
  */
 
 interface GreenhouseLocation {
@@ -30,6 +21,8 @@ interface GreenhouseLocation {
 
 @Component
 export struct MapPage {
+  @StorageLink('themeName') themeName: string = 'frosted';
+
   @State greenhouses: GreenhouseLocation[] = [
     { id: '1', name: '1号蘑菇大棚', status: '运行正常', sensors: 12, alerts: 0, devices: 8, temp: 22.5, humidity: 85, x: 25, y: 35 },
     { id: '2', name: '2号蘑菇大棚', status: '运行正常', sensors: 10, alerts: 0, devices: 6, temp: 21.8, humidity: 82, x: 55, y: 20 },
@@ -43,6 +36,10 @@ export struct MapPage {
   @State selectedId: string = '1';
   @State searchKeyword: string = '';
 
+  t(): ThemeTokens {
+    return ThemeManager.getInstance().getTokens();
+  }
+
   build() {
     Column() {
       this.HeaderSection()
@@ -52,43 +49,39 @@ export struct MapPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor(StyleConstants.BG_PAGE)
+    .backgroundColor(this.t().bgPage)
   }
 
   @Builder
   HeaderSection() {
     Column() {
       Row() {
-        Text('🗺')
-          .fontSize(StyleConstants.FONT_XL)
+        Text('🗺').fontSize(this.t().fontXl)
         Text('地图监控')
-          .fontSize(StyleConstants.FONT_XXL)
-          .fontColor(StyleConstants.TEXT_WHITE)
+          .fontSize(this.t().fontXxl)
+          .fontColor(this.t().textWhite)
           .fontWeight(FontWeight.Bold)
           .margin({ left: 8 })
         Blank()
         Text(`${this.greenhouses.length} 个大棚`)
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(StyleConstants.TEXT_WHITE_SUB)
+          .fontSize(this.t().fontSm)
+          .fontColor(this.t().textWhiteSub)
       }
       .width('100%')
 
       Row() {
-        Text('🔍')
-          .fontSize(StyleConstants.FONT_MD)
+        Text('🔍').fontSize(this.t().fontMd)
         TextInput({ text: this.searchKeyword, placeholder: '搜索大棚名称' })
-          .fontSize(StyleConstants.FONT_MD)
-          .fontColor(StyleConstants.TEXT_TITLE)
-          .placeholderColor(StyleConstants.TEXT_WHITE_SUB)
-          .backgroundColor('#FFFFFF20')
-          .borderRadius(StyleConstants.RADIUS_SM)
+          .fontSize(this.t().fontMd)
+          .fontColor(this.t().textTitle)
+          .placeholderColor(this.t().textWhiteSub)
+          .backgroundColor(this.t().bgCardLight)
+          .borderRadius(this.t().radiusSm)
           .layoutWeight(1)
           .margin({ left: 8 })
           .height(36)
           .padding({ left: 10, right: 10 })
-          .onChange((value: string) => {
-            this.searchKeyword = value;
-          })
+          .onChange((value: string) => { this.searchKeyword = value; })
       }
       .width('100%')
       .margin({ top: 10 })
@@ -98,7 +91,7 @@ export struct MapPage {
     .padding({ left: 16, right: 16, top: 12, bottom: 12 })
     .linearGradient({
       angle: 135,
-      colors: [[StyleConstants.PRIMARY_DARK, 0.0], [StyleConstants.PRIMARY, 0.6], [StyleConstants.PRIMARY_LIGHT, 1.0]]
+      colors: [[this.t().headerGradientTop, 0.0], [this.t().headerGradientBottom, 1.0]]
     })
   }
 
@@ -107,72 +100,40 @@ export struct MapPage {
     Row() {
       Column() {
         Text(`${this.greenhouses.length}`)
-          .fontSize(StyleConstants.FONT_XL)
-          .fontColor(StyleConstants.TEXT_TITLE)
-          .fontWeight(FontWeight.Bold)
-        Text('大棚总数')
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(StyleConstants.TEXT_SUB)
-          .margin({ top: 2 })
-      }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Center)
-
-      Divider().vertical(true).height(28).color(StyleConstants.BORDER_LIGHT)
-
+          .fontSize(this.t().fontXl).fontColor(this.t().textTitle).fontWeight(FontWeight.Bold)
+        Text('大棚总数').fontSize(this.t().fontSm).fontColor(this.t().textSub).margin({ top: 2 })
+      }.layoutWeight(1).alignItems(HorizontalAlign.Center)
+      Divider().vertical(true).height(28).color(this.t().borderLight)
       Column() {
         Text(`${this.getOnlineCount()}`)
-          .fontSize(StyleConstants.FONT_XL)
-          .fontColor(StyleConstants.SUCCESS)
-          .fontWeight(FontWeight.Bold)
-        Text('在线大棚')
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(StyleConstants.TEXT_SUB)
-          .margin({ top: 2 })
-      }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Center)
-
-      Divider().vertical(true).height(28).color(StyleConstants.BORDER_LIGHT)
-
+          .fontSize(this.t().fontXl).fontColor(this.t().success).fontWeight(FontWeight.Bold)
+        Text('在线大棚').fontSize(this.t().fontSm).fontColor(this.t().textSub).margin({ top: 2 })
+      }.layoutWeight(1).alignItems(HorizontalAlign.Center)
+      Divider().vertical(true).height(28).color(this.t().borderLight)
       Column() {
         Text(`${this.getAlertGreenhouses()}`)
-          .fontSize(StyleConstants.FONT_XL)
-          .fontColor(StyleConstants.WARNING)
-          .fontWeight(FontWeight.Bold)
-        Text('告警大棚')
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(StyleConstants.TEXT_SUB)
-          .margin({ top: 2 })
-      }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Center)
-
-      Divider().vertical(true).height(28).color(StyleConstants.BORDER_LIGHT)
-
+          .fontSize(this.t().fontXl).fontColor(this.t().warning).fontWeight(FontWeight.Bold)
+        Text('告警大棚').fontSize(this.t().fontSm).fontColor(this.t().textSub).margin({ top: 2 })
+      }.layoutWeight(1).alignItems(HorizontalAlign.Center)
+      Divider().vertical(true).height(28).color(this.t().borderLight)
       Column() {
         Text(`${this.getTotalSensors()}`)
-          .fontSize(StyleConstants.FONT_XL)
-          .fontColor(StyleConstants.INFO)
-          .fontWeight(FontWeight.Bold)
-        Text('传感器总数')
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(StyleConstants.TEXT_SUB)
-          .margin({ top: 2 })
-      }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Center)
+          .fontSize(this.t().fontXl).fontColor(this.t().info).fontWeight(FontWeight.Bold)
+        Text('传感器总数').fontSize(this.t().fontSm).fontColor(this.t().textSub).margin({ top: 2 })
+      }.layoutWeight(1).alignItems(HorizontalAlign.Center)
     }
     .width('100%')
     .padding({ top: 14, bottom: 14 })
-    .backgroundColor(StyleConstants.BG_CARD)
-    .borderRadius(StyleConstants.RADIUS_LG)
+    .backgroundColor(this.t().bgCard)
+    .backdropBlur(this.t().blurAmount)
+    .border({ width: 1, color: this.t().border })
+    .borderRadius(this.t().radiusLg)
     .margin({ top: 10, left: 12, right: 12 })
     .shadow({
-      radius: StyleConstants.SHADOW_CARD_RADIUS,
-      color: StyleConstants.SHADOW_CARD_COLOR,
+      radius: this.t().shadowCardRadius,
+      color: this.t().shadowCardColor,
       offsetX: 0,
-      offsetY: StyleConstants.SHADOW_CARD_OFFSETY
+      offsetY: this.t().shadowCardOffsetY
     })
   }
 
@@ -180,7 +141,7 @@ export struct MapPage {
   MapSection() {
     Stack({ alignContent: Alignment.Bottom }) {
       Stack() {
-        // 模拟地图背景
+        // 模拟地图背景（固定自然绿色调，不随主题变化）
         Column()
           .width('100%')
           .height('100%')
@@ -189,102 +150,80 @@ export struct MapPage {
             colors: [['#E8F5E9', 0.0], ['#C8E6C9', 0.5], ['#A5D6A7', 1.0]]
           })
 
-        // 网格坐标系 - 横线
+        // 网格横线
         Column() {
           ForEach([0, 1, 2, 3, 4, 5], () => {
             Row().width('100%').height(1).backgroundColor('#FFFFFF80')
           })
-        }
-        .width('100%')
-        .height('100%')
-        .justifyContent(FlexAlign.SpaceEvenly)
+        }.width('100%').height('100%').justifyContent(FlexAlign.SpaceEvenly)
 
-        // 网格坐标系 - 竖线
+        // 网格竖线
         Row() {
           ForEach([0, 1, 2, 3, 4, 5, 6], () => {
             Column().width(1).height('100%').backgroundColor('#FFFFFF60')
           })
-        }
-        .width('100%')
-        .height('100%')
-        .justifyContent(FlexAlign.SpaceEvenly)
+        }.width('100%').height('100%').justifyContent(FlexAlign.SpaceEvenly)
 
-        // 大棚标记点
+        // 大棚标记
         ForEach(this.getFilteredGreenhouses(), (item: GreenhouseLocation) => {
           this.Marker(item)
         }, (item: GreenhouseLocation) => item.id)
 
-        // 比例尺指示器
+        // 比例尺
         Row() {
-          Column().width(2).height(8).backgroundColor(StyleConstants.TEXT_SUB)
-          Column().width(56).height(2).backgroundColor(StyleConstants.TEXT_SUB)
-          Column().width(2).height(8).backgroundColor(StyleConstants.TEXT_SUB)
-          Text(' 50m')
-            .fontSize(StyleConstants.FONT_XS)
-            .fontColor(StyleConstants.TEXT_SUB)
-        }
-        .alignItems(VerticalAlign.Center)
-        .position({ x: 12, y: 12 })
+          Column().width(2).height(8).backgroundColor(this.t().textSub)
+          Column().width(56).height(2).backgroundColor(this.t().textSub)
+          Column().width(2).height(8).backgroundColor(this.t().textSub)
+          Text(' 50m').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+        }.alignItems(VerticalAlign.Center).position({ x: 12, y: 12 })
 
-        // 底部提示（保留 HMS Map Kit 接入点）
+        // 底部提示
         Row() {
           Text('📍 后续集成 HMS Map Kit')
-            .fontSize(StyleConstants.FONT_XS)
-            .fontColor(StyleConstants.TEXT_SUB)
+            .fontSize(this.t().fontXs).fontColor(this.t().textSub)
             .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-            .backgroundColor('#FFFFFFCC')
-            .borderRadius(StyleConstants.RADIUS_SM)
-        }
-        .position({ x: '50%', y: 12 })
-        .translate({ x: '-50%' })
+            .backgroundColor(this.t().bgCard)
+            .borderRadius(this.t().radiusSm)
+        }.position({ x: '50%', y: 12 }).translate({ x: '-50%' })
       }
-      .width('100%')
-      .height('100%')
+      .width('100%').height('100%')
 
-      // 选中大棚的详情卡片浮层
       this.DetailCard(this.getSelectedGreenhouse())
     }
-    .width('100%')
-    .height(320)
+    .width('100%').height(320)
     .margin({ top: 10, left: 12, right: 12 })
-    .borderRadius(StyleConstants.RADIUS_LG)
+    .borderRadius(this.t().radiusLg)
     .clip(true)
-    .backgroundColor(StyleConstants.BG_CARD_LIGHT)
+    .backgroundColor(this.t().bgCardLight)
   }
 
   @Builder
   Marker(item: GreenhouseLocation) {
     Stack() {
-      // 选中态光环（动画）
+      // 选中态光环
       Circle({ width: 30, height: 30 })
-        .fill(this.getStatusColor(item.status) + '40')
+        .fill(this.t().bgCardLight)
         .opacity(item.id === this.selectedId ? 1 : 0)
         .scale({ x: item.id === this.selectedId ? 1.4 : 1, y: item.id === this.selectedId ? 1.4 : 1 })
         .animation({ duration: 300, curve: Curve.EaseOut })
 
-      // 标记圆点
       Circle({ width: 14, height: 14 })
         .fill(this.getStatusColor(item.status))
-        .border({ width: 2, color: '#FFFFFF' })
+        .border({ width: 2, color: this.t().textWhite })
         .scale({ x: item.id === this.selectedId ? 1.2 : 1, y: item.id === this.selectedId ? 1.2 : 1 })
         .animation({ duration: 200, curve: Curve.EaseOut })
 
-      // 选中态名称标签
       if (item.id === this.selectedId) {
         Text(item.name)
-          .fontSize(StyleConstants.FONT_XS)
-          .fontColor(StyleConstants.TEXT_WHITE)
+          .fontSize(this.t().fontXs).fontColor(this.t().textOnPrimary)
           .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-          .backgroundColor(StyleConstants.PRIMARY)
-          .borderRadius(StyleConstants.RADIUS_SM)
-          .position({ x: '50%', y: -22 })
-          .translate({ x: '-50%' })
+          .backgroundColor(this.t().primary)
+          .borderRadius(this.t().radiusSm)
+          .position({ x: '50%', y: -22 }).translate({ x: '-50%' })
       }
     }
     .position({ x: `${item.x}%`, y: `${item.y}%` })
-    .onClick(() => {
-      this.selectedId = item.id;
-    })
+    .onClick(() => { this.selectedId = item.id; })
   }
 
   @Builder
@@ -294,137 +233,65 @@ export struct MapPage {
         Row() {
           Column() {
             Text(item.name)
-              .fontSize(StyleConstants.FONT_LG)
-              .fontColor(StyleConstants.TEXT_TITLE)
-              .fontWeight(FontWeight.Bold)
+              .fontSize(this.t().fontLg).fontColor(this.t().textTitle).fontWeight(FontWeight.Bold)
             Row() {
-              Circle({ width: 6, height: 6 })
-                .fill(this.getStatusColor(item.status))
+              Circle({ width: 6, height: 6 }).fill(this.getStatusColor(item.status))
               Text(item.status)
-                .fontSize(StyleConstants.FONT_XS)
-                .fontColor(this.getStatusColor(item.status))
-                .margin({ left: 4 })
-            }
-            .margin({ top: 4 })
-            .alignItems(VerticalAlign.Center)
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
+                .fontSize(this.t().fontXs).fontColor(this.getStatusColor(item.status)).margin({ left: 4 })
+            }.margin({ top: 4 }).alignItems(VerticalAlign.Center)
+          }.alignItems(HorizontalAlign.Start).layoutWeight(1)
 
-          // 查看详情按钮（预留 AppRouter.push 接入点）
           Text('查看详情')
-            .fontSize(StyleConstants.FONT_SM)
-            .fontColor(StyleConstants.TEXT_WHITE)
+            .fontSize(this.t().fontSm).fontColor(this.t().textOnPrimary)
             .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-            .backgroundColor(StyleConstants.PRIMARY)
-            .borderRadius(StyleConstants.RADIUS_SM)
-            .onClick(() => {
-              // AppRouter 位于 entry 模块，features/core 无法直接 import
-              // 由容器层注入跳转回调，此处保留接入点
-            })
-        }
-        .width('100%')
-        .alignItems(VerticalAlign.Top)
+            .backgroundColor(this.t().primary).borderRadius(this.t().radiusSm)
+            .onClick(() => { /* AppRouter 接入点 */ })
+        }.width('100%').alignItems(VerticalAlign.Top)
 
-        // 传感器 / 告警 / 设备 数量
         Row() {
           Column() {
-            Text(`${item.sensors}`)
-              .fontSize(StyleConstants.FONT_MD)
-              .fontColor(StyleConstants.INFO)
-              .fontWeight(FontWeight.Bold)
-            Text('传感器')
-              .fontSize(StyleConstants.FONT_XS)
-              .fontColor(StyleConstants.TEXT_HINT)
-          }
-          .layoutWeight(1)
-          .alignItems(HorizontalAlign.Center)
-
+            Text(`${item.sensors}`).fontSize(this.t().fontMd).fontColor(this.t().info).fontWeight(FontWeight.Bold)
+            Text('传感器').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+          }.layoutWeight(1).alignItems(HorizontalAlign.Center)
           Column() {
             Text(`${item.alerts}`)
-              .fontSize(StyleConstants.FONT_MD)
-              .fontColor(item.alerts > 0 ? StyleConstants.WARNING : StyleConstants.TEXT_HINT)
-              .fontWeight(FontWeight.Bold)
-            Text('告警')
-              .fontSize(StyleConstants.FONT_XS)
-              .fontColor(StyleConstants.TEXT_HINT)
-          }
-          .layoutWeight(1)
-          .alignItems(HorizontalAlign.Center)
-
+              .fontSize(this.t().fontMd).fontColor(item.alerts > 0 ? this.t().warning : this.t().textSub).fontWeight(FontWeight.Bold)
+            Text('告警').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+          }.layoutWeight(1).alignItems(HorizontalAlign.Center)
           Column() {
-            Text(`${item.devices}`)
-              .fontSize(StyleConstants.FONT_MD)
-              .fontColor(StyleConstants.TEXT_BODY)
-              .fontWeight(FontWeight.Bold)
-            Text('设备')
-              .fontSize(StyleConstants.FONT_XS)
-              .fontColor(StyleConstants.TEXT_HINT)
-          }
-          .layoutWeight(1)
-          .alignItems(HorizontalAlign.Center)
-        }
-        .width('100%')
-        .margin({ top: 10 })
+            Text(`${item.devices}`).fontSize(this.t().fontMd).fontColor(this.t().textBody).fontWeight(FontWeight.Bold)
+            Text('设备').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+          }.layoutWeight(1).alignItems(HorizontalAlign.Center)
+        }.width('100%').margin({ top: 10 })
 
-        // 温湿度 2x2 mini grid（标签行 + 数值行）
         Row() {
-          // 温度列
           Column() {
-            Text('🌡 温度')
-              .fontSize(StyleConstants.FONT_XS)
-              .fontColor(StyleConstants.TEXT_HINT)
+            Text('🌡 温度').fontSize(this.t().fontXs).fontColor(this.t().textSub)
             Row() {
               Text(item.status === '离线' ? '--' : `${item.temp.toFixed(1)}`)
-                .fontSize(StyleConstants.FONT_LG)
-                .fontColor(StyleConstants.COLOR_TEMP)
-                .fontWeight(FontWeight.Bold)
-              Text('°C')
-                .fontSize(StyleConstants.FONT_SM)
-                .fontColor(StyleConstants.TEXT_HINT)
-                .margin({ left: 2 })
-            }
-            .margin({ top: 4 })
-            .alignItems(VerticalAlign.Bottom)
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-
-          // 湿度列
+                .fontSize(this.t().fontLg).fontColor(this.t().textTitle).fontWeight(FontWeight.Bold)
+              Text('°C').fontSize(this.t().fontSm).fontColor(this.t().textSub).margin({ left: 2 })
+            }.margin({ top: 4 }).alignItems(VerticalAlign.Bottom)
+          }.alignItems(HorizontalAlign.Start).layoutWeight(1)
           Column() {
-            Text('💧 湿度')
-              .fontSize(StyleConstants.FONT_XS)
-              .fontColor(StyleConstants.TEXT_HINT)
+            Text('💧 湿度').fontSize(this.t().fontXs).fontColor(this.t().textSub)
             Row() {
               Text(item.status === '离线' ? '--' : `${item.humidity.toFixed(0)}`)
-                .fontSize(StyleConstants.FONT_LG)
-                .fontColor(StyleConstants.COLOR_HUMIDITY)
-                .fontWeight(FontWeight.Bold)
-              Text('%')
-                .fontSize(StyleConstants.FONT_SM)
-                .fontColor(StyleConstants.TEXT_HINT)
-                .margin({ left: 2 })
-            }
-            .margin({ top: 4 })
-            .alignItems(VerticalAlign.Bottom)
-          }
-          .alignItems(HorizontalAlign.Start)
-          .layoutWeight(1)
-        }
-        .width('100%')
-        .padding({ top: 10 })
-        .border({ width: { top: 1 }, color: StyleConstants.BORDER_LIGHT })
-        .margin({ top: 10 })
+                .fontSize(this.t().fontLg).fontColor(this.t().textTitle).fontWeight(FontWeight.Bold)
+              Text('%').fontSize(this.t().fontSm).fontColor(this.t().textSub).margin({ left: 2 })
+            }.margin({ top: 4 }).alignItems(VerticalAlign.Bottom)
+          }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+        }.width('100%').padding({ top: 10 })
+        .border({ width: { top: 1 }, color: this.t().borderLight }).margin({ top: 10 })
       }
-      .width('100%')
-      .padding(12)
-      .backgroundColor(StyleConstants.BG_CARD)
-      .borderRadius({ topLeft: StyleConstants.RADIUS_LG, topRight: StyleConstants.RADIUS_LG })
+      .width('100%').padding(12)
+      .backgroundColor(this.t().bgCard)
+      .borderRadius({ topLeft: this.t().radiusLg, topRight: this.t().radiusLg })
       .shadow({
-        radius: StyleConstants.SHADOW_FLOAT_RADIUS,
-        color: StyleConstants.SHADOW_FLOAT_COLOR,
+        radius: this.t().shadowFloatRadius,
+        color: this.t().shadowFloatColor,
         offsetX: 0,
-        offsetY: StyleConstants.SHADOW_FLOAT_OFFSETY
+        offsetY: this.t().shadowFloatOffsetY
       })
     }
   }
@@ -433,18 +300,11 @@ export struct MapPage {
   GreenhouseList() {
     Column() {
       Row() {
-        Text('大棚列表')
-          .fontSize(StyleConstants.FONT_LG)
-          .fontColor(StyleConstants.TEXT_TITLE)
-          .fontWeight(FontWeight.Bold)
+        Text('大棚列表').fontSize(this.t().fontLg).fontColor(this.t().textTitle).fontWeight(FontWeight.Bold)
         Blank()
         Text(`${this.getFilteredGreenhouses().length} / ${this.greenhouses.length}`)
-          .fontSize(StyleConstants.FONT_SM)
-          .fontColor(StyleConstants.TEXT_HINT)
-      }
-      .width('100%')
-      .margin({ bottom: 10 })
-      .alignItems(VerticalAlign.Center)
+          .fontSize(this.t().fontSm).fontColor(this.t().textSub)
+      }.width('100%').margin({ bottom: 10 }).alignItems(VerticalAlign.Center)
 
       Scroll() {
         Column() {
@@ -452,153 +312,94 @@ export struct MapPage {
             this.GreenhouseCard(item)
           }, (item: GreenhouseLocation) => item.id)
           Blank().height(80)
-        }
-        .width('100%')
-      }
-      .layoutWeight(1)
-      .scrollBar(BarState.Auto)
+        }.width('100%')
+      }.layoutWeight(1).scrollBar(BarState.Auto)
     }
-    .width('100%')
-    .layoutWeight(1)
+    .width('100%').layoutWeight(1)
     .padding({ left: 12, right: 12, top: 12 })
   }
 
   @Builder
   GreenhouseCard(item: GreenhouseLocation) {
     Row() {
-      // 状态色点
       Circle({ width: 10, height: 10 })
         .fill(this.getStatusColor(item.status))
-        .border({ width: 2, color: '#FFFFFF' })
+        .border({ width: 2, color: this.t().textWhite })
 
-      // 大棚信息
       Column() {
         Text(item.name)
-          .fontSize(StyleConstants.FONT_MD)
-          .fontColor(item.id === this.selectedId ? StyleConstants.PRIMARY : StyleConstants.TEXT_TITLE)
+          .fontSize(this.t().fontMd)
+          .fontColor(item.id === this.selectedId ? this.t().primary : this.t().textTitle)
           .fontWeight(FontWeight.Medium)
         Text(item.status)
-          .fontSize(StyleConstants.FONT_XS)
-          .fontColor(this.getStatusColor(item.status))
-          .margin({ top: 4 })
-      }
-      .alignItems(HorizontalAlign.Start)
-      .layoutWeight(1)
-      .margin({ left: 10 })
+          .fontSize(this.t().fontXs).fontColor(this.getStatusColor(item.status)).margin({ top: 4 })
+      }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 10 })
 
-      // 传感器数
       Column() {
-        Text(`${item.sensors}`)
-          .fontSize(StyleConstants.FONT_LG)
-          .fontColor(StyleConstants.INFO)
-          .fontWeight(FontWeight.Bold)
-        Text('传感器')
-          .fontSize(StyleConstants.FONT_XS)
-          .fontColor(StyleConstants.TEXT_HINT)
-      }
-      .margin({ right: 16 })
-      .alignItems(HorizontalAlign.Center)
+        Text(`${item.sensors}`).fontSize(this.t().fontLg).fontColor(this.t().info).fontWeight(FontWeight.Bold)
+        Text('传感器').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+      }.margin({ right: 16 }).alignItems(HorizontalAlign.Center)
 
-      // 告警数
       Column() {
         Text(`${item.alerts}`)
-          .fontSize(StyleConstants.FONT_LG)
-          .fontColor(item.alerts > 0 ? StyleConstants.WARNING : StyleConstants.TEXT_HINT)
-          .fontWeight(FontWeight.Bold)
-        Text('告警')
-          .fontSize(StyleConstants.FONT_XS)
-          .fontColor(StyleConstants.TEXT_HINT)
-      }
-      .alignItems(HorizontalAlign.Center)
+          .fontSize(this.t().fontLg).fontColor(item.alerts > 0 ? this.t().warning : this.t().textSub).fontWeight(FontWeight.Bold)
+        Text('告警').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+      }.alignItems(HorizontalAlign.Center)
     }
-    .width('100%')
-    .padding(14)
-    .alignItems(VerticalAlign.Center)
-    .backgroundColor(item.id === this.selectedId ? StyleConstants.BG_CARD_LIGHT : StyleConstants.BG_CARD)
-    .borderRadius(StyleConstants.RADIUS_MD)
+    .width('100%').padding(14).alignItems(VerticalAlign.Center)
+    .backgroundColor(item.id === this.selectedId ? this.t().bgCardLight : this.t().bgCard)
+    .backdropBlur(this.t().blurAmount)
+    .borderRadius(this.t().radiusMd)
     .margin({ bottom: 8 })
-    .borderWidth(item.id === this.selectedId ? 1.5 : 0)
-    .borderColor(item.id === this.selectedId ? StyleConstants.PRIMARY : StyleConstants.BG_CARD)
+    .border({ width: item.id === this.selectedId ? 1.5 : 0, color: item.id === this.selectedId ? this.t().primary : 'transparent' })
     .shadow({
-      radius: 4,
-      color: '#0A000000',
+      radius: this.t().shadowCardRadius,
+      color: this.t().shadowCardColor,
       offsetX: 0,
-      offsetY: 1
+      offsetY: this.t().shadowCardOffsetY
     })
-    .onClick(() => {
-      this.selectedId = item.id;
-    })
+    .onClick(() => { this.selectedId = item.id; })
   }
 
   // ============ 私有方法 ============
 
   private getFilteredGreenhouses(): GreenhouseLocation[] {
-    if (this.searchKeyword.length === 0) {
-      return this.greenhouses;
-    }
+    if (this.searchKeyword.length === 0) { return this.greenhouses; }
     return this.greenhouses.filter((g: GreenhouseLocation) => g.name.indexOf(this.searchKeyword) >= 0);
   }
 
   private getStatusColor(status: string): string {
-    if (status === '运行正常') {
-      return StyleConstants.SUCCESS;
-    }
-    if (status === '离线') {
-      return StyleConstants.TEXT_HINT;
-    }
-    return StyleConstants.WARNING;
+    if (status === '运行正常') { return this.t().success; }
+    if (status === '离线') { return this.t().textSub; }
+    return this.t().warning;
   }
 
   private getTotalSensors(): number {
     let total: number = 0;
-    const list: GreenhouseLocation[] = this.greenhouses;
-    for (let i = 0; i < list.length; i++) {
-      total += list[i].sensors;
-    }
+    for (let i = 0; i < this.greenhouses.length; i++) { total += this.greenhouses[i].sensors; }
     return total;
   }
 
   private getOnlineCount(): number {
     let count: number = 0;
-    const list: GreenhouseLocation[] = this.greenhouses;
-    for (let i = 0; i < list.length; i++) {
-      if (list[i].status !== '离线') {
-        count += 1;
-      }
+    for (let i = 0; i < this.greenhouses.length; i++) {
+      if (this.greenhouses[i].status !== '离线') { count += 1; }
     }
     return count;
   }
 
   private getAlertGreenhouses(): number {
     let count: number = 0;
-    const list: GreenhouseLocation[] = this.greenhouses;
-    for (let i = 0; i < list.length; i++) {
-      if (list[i].alerts > 0) {
-        count += 1;
-      }
+    for (let i = 0; i < this.greenhouses.length; i++) {
+      if (this.greenhouses[i].alerts > 0) { count += 1; }
     }
     return count;
   }
 
   private getSelectedGreenhouse(): GreenhouseLocation {
-    const list: GreenhouseLocation[] = this.greenhouses;
-    for (let i = 0; i < list.length; i++) {
-      if (list[i].id === this.selectedId) {
-        return list[i];
-      }
+    for (let i = 0; i < this.greenhouses.length; i++) {
+      if (this.greenhouses[i].id === this.selectedId) { return this.greenhouses[i]; }
     }
-    // 兜底：返回空对象，避免 undefined 流入 UI（ArkTS 禁止 undefined 跨组件传递）
-    return {
-      id: '',
-      name: '',
-      status: '',
-      sensors: 0,
-      alerts: 0,
-      devices: 0,
-      temp: 0,
-      humidity: 0,
-      x: 0,
-      y: 0
-    };
+    return { id: '', name: '', status: '', sensors: 0, alerts: 0, devices: 0, temp: 0, humidity: 0, x: 0, y: 0 };
   }
 }
