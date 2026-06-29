@@ -20,7 +20,7 @@ const TAG = 'DashboardPage';
 export struct DashboardPage {
   @StorageLink('currentBreakpoint') currentBreakpoint: string = BreakpointConstants.SM;
   /** 监听主题切换，框架自动触发 build() 重绘 */
-  @StorageLink('themeName') themeName: string = 'frosted';
+  @StorageLink('themeName') @Watch('onThemeChange') themeName: string = 'frosted';
 
   @State greenhouseName: string = '1号蘑菇大棚';
   @State greenhouseStatus: string = '运行正常';
@@ -70,11 +70,40 @@ export struct DashboardPage {
     this.buildTrendData();
     // 2. 异步加载云端属性
     this.loadFromViewModel();
-    // 3. 入场动画（黑白主题跳过）
+    // 3. 入场动画（黑白主题直接显示全部卡片）
+    this.applyEntranceForCurrentTheme();
+  }
+
+  /** 主题切换时重置入场状态，避免 cardEntrance=0 导致卡片 opacity 为 0 */
+  onThemeChange(): void {
+    this.applyEntranceForCurrentTheme();
+  }
+
+  private applyEntranceForCurrentTheme(): void {
+    this.stopStaggerEntrance();
+    this.stopBreathingGlow();
     if (this.t().animationEnabled) {
+      this.cardEntrance = 0;
       this.startStaggerEntrance();
       this.checkBreathingGlow();
+    } else {
+      this.cardEntrance = 10;
     }
+  }
+
+  /** 黑白主题无入场动画，卡片应始终可见 */
+  private getEntranceOpacity(threshold: number): number {
+    if (!this.t().animationEnabled) {
+      return 1;
+    }
+    return this.cardEntrance > threshold ? 1 : 0;
+  }
+
+  private getEntranceTranslateY(threshold: number, offset: number = 16): number {
+    if (!this.t().animationEnabled) {
+      return 0;
+    }
+    return this.cardEntrance > threshold ? 0 : offset;
   }
 
   aboutToDisappear(): void {
@@ -337,23 +366,24 @@ export struct DashboardPage {
           ]
         })
 
-      // 右上装饰光晕 — 用 .blur() 模糊自身（不是 backdropBlur）
-      Ellipse()
-        .width(200)
-        .height(200)
-        .fill(this.t().primary)
-        .blur(60)
-        .opacity(0.15)
-        .position({ x: '60%', y: '-30%' })
+      // 装饰光晕仅雾透主题使用；黑白主题保持纯黑 Header
+      if (this.t().animationEnabled) {
+        Ellipse()
+          .width(200)
+          .height(200)
+          .fill(this.t().primary)
+          .blur(60)
+          .opacity(0.15)
+          .position({ x: '60%', y: '-30%' })
 
-      // 左下装饰光晕
-      Ellipse()
-        .width(150)
-        .height(150)
-        .fill(this.t().primaryLight)
-        .blur(50)
-        .opacity(0.1)
-        .position({ x: '-10%', y: '60%' })
+        Ellipse()
+          .width(150)
+          .height(150)
+          .fill(this.t().primaryLight)
+          .blur(50)
+          .opacity(0.1)
+          .position({ x: '-10%', y: '60%' })
+      }
 
       // 内容层（大棚名、状态、天气、告警条）
       Column() {
@@ -407,8 +437,12 @@ export struct DashboardPage {
           .width('100%')
           .height(36)
           .padding({ left: 16, right: 16 })
-          .margin({ top: 12 })
-          .backgroundColor(this.t().bgCardLight)
+          .margin({ top: 12, left: 20, right: 20 })
+          .backgroundColor(this.t().animationEnabled ? this.t().bgCardLight : this.t().bgCard)
+          .border({
+            width: this.t().animationEnabled ? 0 : 1,
+            color: this.t().border
+          })
           .borderRadius(this.t().radiusSm)
           .onClick(() => {
             this.onAlertClick();
@@ -437,9 +471,9 @@ export struct DashboardPage {
       Divider().vertical(true).height(36).color(this.t().divider)
       this.StatItem('在培批次', this.overviewBatches.toString(), this.t().warning)
     }
-    .opacity(this.cardEntrance > 5 ? 1 : 0)
-    .translate({ y: this.cardEntrance > 5 ? 0 : 16 })
-    .animation({ duration: 400, curve: Curve.EaseOut })
+    .opacity(this.getEntranceOpacity(5))
+    .translate({ y: this.getEntranceTranslateY(5) })
+    .animation({ duration: this.t().animationDuration, curve: Curve.EaseOut })
     .width('100%')
     .padding({ top: 18, bottom: 18 })
     .backgroundColor(this.t().bgCard)
@@ -487,9 +521,9 @@ export struct DashboardPage {
         GridCol({ span: this.getSensorSpan() }) {
             this.SensorCard(item, index)
           }
-          .opacity(this.cardEntrance > index ? 1 : 0)
-          .translate({ y: this.cardEntrance > index ? 0 : 20 })
-          .animation({ duration: 400, curve: Curve.EaseOut })
+          .opacity(this.getEntranceOpacity(index))
+          .translate({ y: this.getEntranceTranslateY(index, 20) })
+          .animation({ duration: this.t().animationDuration, curve: Curve.EaseOut })
       })
     }
     .width('100%')
@@ -499,16 +533,18 @@ export struct DashboardPage {
   @Builder
   SensorCard(item: SensorDataItem, index: number) {
     Stack() {
-      // 状态光晕 — 危险传感器呼吸：opacity 由 breathingPhase 驱动
-      Ellipse()
-        .width('80%')
-        .height(30)
-        .fill(this.getStatusColor(item.status))
-        .blur(20)
-        .opacity(item.status >= 2 && this.breathingActive
-          ? 0.2 + this.breathingPhase * 0.5  // 呼吸：0.2 ↔ 0.7
-          : 0.4)
-        .position({ x: '10%', y: '70%' })
+      // 状态光晕仅雾透主题；黑白主题用边框色条区分状态
+      if (this.t().animationEnabled) {
+        Ellipse()
+          .width('80%')
+          .height(30)
+          .fill(this.getStatusColor(item.status))
+          .blur(20)
+          .opacity(item.status >= 2 && this.breathingActive
+            ? 0.2 + this.breathingPhase * 0.5
+            : 0.4)
+          .position({ x: '10%', y: '70%' })
+      }
 
       Column() {
         // 图标 + 状态点
@@ -581,7 +617,7 @@ export struct DashboardPage {
       if (this.trendData.length > 0) {
         BarChartComponent({
           data: this.trendData,
-          barColor: this.t().primaryLight,
+          barColor: this.t().animationEnabled ? this.t().primaryLight : this.t().primary,
           labelColor: this.t().textTitle,
           axisColor: this.t().textSub,
           baselineColor: this.t().divider,
@@ -608,9 +644,9 @@ export struct DashboardPage {
       offsetX: 0,
       offsetY: this.t().shadowCardOffsetY
     })
-    .opacity(this.cardEntrance > 6 ? 1 : 0)
-    .translate({ y: this.cardEntrance > 6 ? 0 : 16 })
-    .animation({ duration: 400, curve: Curve.EaseOut })
+    .opacity(this.getEntranceOpacity(6))
+    .translate({ y: this.getEntranceTranslateY(6) })
+    .animation({ duration: this.t().animationDuration, curve: Curve.EaseOut })
   }
 
   // ==================== 快捷控制（脉冲动画） ====================
@@ -677,9 +713,9 @@ export struct DashboardPage {
       offsetX: 0,
       offsetY: this.t().shadowCardOffsetY
     })
-    .opacity(this.cardEntrance > 7 ? 1 : 0)
-    .translate({ y: this.cardEntrance > 7 ? 0 : 16 })
-    .animation({ duration: 400, curve: Curve.EaseOut })
+    .opacity(this.getEntranceOpacity(7))
+    .translate({ y: this.getEntranceTranslateY(7) })
+    .animation({ duration: this.t().animationDuration, curve: Curve.EaseOut })
   }
 
   // ==================== 实时告警（毛玻璃卡片） ====================
@@ -765,8 +801,8 @@ export struct DashboardPage {
       offsetX: 0,
       offsetY: this.t().shadowCardOffsetY
     })
-    .opacity(this.cardEntrance > 8 ? 1 : 0)
-    .translate({ y: this.cardEntrance > 8 ? 0 : 16 })
-    .animation({ duration: 400, curve: Curve.EaseOut })
+    .opacity(this.getEntranceOpacity(8))
+    .translate({ y: this.getEntranceTranslateY(8) })
+    .animation({ duration: this.t().animationDuration, curve: Curve.EaseOut })
   }
 }
