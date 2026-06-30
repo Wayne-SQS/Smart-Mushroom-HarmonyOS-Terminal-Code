@@ -1,17 +1,29 @@
-import { MapViewComponent, MapMarker } from 'common-base';
+import { MapViewComponent, MapMarker, MapViewColors, BreakpointConstants, AdaptiveUtils } from 'common-base';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeTokens } from '../theme/ThemeTokens';
+import { Logger } from 'common-base';
+import promptAction from '@ohos.promptAction';
+
+const TAG = 'MapPage';
 
 /**
- * 地图监控页面 - HMS Map Kit + 降级双模式
+ * 地图监控页面 - 断点分栏 + 双模式地图 + 多端降级
  *
- * 坐标系统：
- *   - 使用 WGS84 真实经纬度（武汉及周边区域）
- *   - Map Kit 模式：直接渲染到真实地图
- *   - 降级模式：经纬度投影到 Canvas 画布百分比坐标
+ * 多端适配策略（不写 deviceInfo.deviceType，只用断点 + canIUse）：
+ *   - XS（wearable）：极简模式，只列表，点项跳 DashboardPage
+ *   - SM（手机竖屏）：上下分栏（地图上 40% + 列表下 60%）
+ *   - MD/LG/XL（平板/2in1/PC）：左右分栏（列表左 40% + 地图右 60%）
  *
- * 当 Map Kit 系统能力可用时自动使用真实地图；
- * 否则降级为自定义 Canvas 地图（无需 AGC 配置即可运行）。
+ * 地图模式：MapViewComponent 内部 canIUse('SystemCapability.Map.Core') 自动切换
+ *   - 真实 Map Kit：渲染真实瓦片，支持缩放/平移
+ *   - Canvas 降级：经纬度投影自绘
+ *
+ * 交互：
+ *   - 状态筛选（全部/正常/告警/离线）Tab 式切换
+ *   - 告警排序开关（开启时按 alerts 降序）
+ *   - 搜索联动地图（过滤列表 + 高亮首个匹配项）
+ *   - 列表项内联展开详情（手风琴式，只展开一个）
+ *   - "查看详情"跳 DashboardPage（传 greenhouseId 占位）
  */
 
 interface GreenhouseLocation {
@@ -29,9 +41,24 @@ interface GreenhouseLocation {
   lng: number;
 }
 
+/** 状态筛选枚举 */
+type StatusFilter = 'all' | 'normal' | 'alert' | 'offline';
+
+/**
+ * 大棚详情路由参数
+ *
+ * 用于 MapPage 跳转 DashboardPage 时传递 greenhouseId。
+ * 显式声明 interface 避免 Record<string, Object> 字面量违反
+ * ArkTS no-untyped-obj-literals 规则。
+ */
+interface GreenhouseNavParam {
+  readonly greenhouseId: string;
+}
+
 @Component
 export struct MapPage {
   @StorageLink('themeName') themeName: string = 'frosted';
+  @StorageLink('currentBreakpoint') currentBreakpoint: string = BreakpointConstants.SM;
 
   /** 大棚位置数据（武汉周边真实经纬度） */
   @State greenhouses: GreenhouseLocation[] = [
@@ -46,6 +73,25 @@ export struct MapPage {
   ];
   @State selectedId: string = '1';
   @State searchKeyword: string = '';
+  @State statusFilter: StatusFilter = 'all';
+  @State alertSortEnabled: boolean = false;
+
+  /** 地图高级功能开关（仅真实 Map Kit 模式生效，Canvas 降级模式无影响） */
+  @State isSatellite: boolean = false;        // 卫星图切换
+  @State enableCluster: boolean = false;      // 标记聚合 Cluster
+  @State enableMyLocation: boolean = false;   // 我的位置图层 + 按钮
+
+  /** 方案 D 重构新增状态 */
+  @State isMapFullscreen: boolean = false;    // 地图全屏模式（列表收为底部 mini bar）
+  @State isSearchVisible: boolean = false;    // 搜索 overlay 浮层可见性
+  @State sheetVisible: boolean = false;       // 详情 BottomSheet 可见性
+  @State sheetItem: GreenhouseLocation = MapPage.EMPTY_GREENHOUSE;  // BottomSheet 当前展示的大棚
+
+  /** 空哨兵对象，避免 sheetItem 为 null 触发类型断言 */
+  private static readonly EMPTY_GREENHOUSE: GreenhouseLocation = {
+    id: '', name: '', status: '', sensors: 0, alerts: 0, devices: 0,
+    temp: 0, humidity: 0, lat: 0, lng: 0
+  };
 
   /** 地图中心（所有大棚的几何中心） */
   private mapCenterLat: number = 30.51;
@@ -55,11 +101,24 @@ export struct MapPage {
     return ThemeManager.getInstance().getTokens();
   }
 
+  /** 是否为 wearable 极简模式（XS 断点，不写 deviceType） */
+  private isWearableMode(): boolean {
+    return this.currentBreakpoint === BreakpointConstants.XS;
+  }
+
+  /** 是否为宽屏分栏模式（MD/LG/XL） */
+  private isWideSplitMode(): boolean {
+    return this.currentBreakpoint === BreakpointConstants.MD
+      || this.currentBreakpoint === BreakpointConstants.LG
+      || this.currentBreakpoint === BreakpointConstants.XL;
+  }
+
   /** 将 GreenhouseLocation 转为 MapMarker */
   private toMapMarkers(): MapMarker[] {
     const result: MapMarker[] = [];
-    for (let i = 0; i < this.greenhouses.length; i++) {
-      const g = this.greenhouses[i];
+    const filtered = this.getFilteredGreenhouses();
+    for (let i = 0; i < filtered.length; i++) {
+      const g = filtered[i];
       result.push({
         id: g.id,
         lat: g.lat,
@@ -72,38 +131,310 @@ export struct MapPage {
     return result;
   }
 
+  /** 从 ThemeTokens 构造 Canvas 降级模式颜色 */
+  private buildMapViewColors(): MapViewColors {
+    const tk = this.t();
+    return {
+      bgGradientTop: tk.bgCardLight,
+      bgGradientMid: tk.bgCard,
+      bgGradientBottom: tk.bgCardLight,
+      gridLine: tk.borderLight,
+      metaText: tk.textHint,
+      metaBg: tk.bgCard,
+      markerBorder: tk.textWhite,
+      markerGlow: tk.textWhite,
+      labelBg: tk.textTitle,
+      labelText: tk.textWhite
+    };
+  }
+
   build() {
+    Stack() {
+      // 主内容层（根据断点 + 全屏状态选择布局）
+      if (this.isWearableMode()) {
+        this.WearableLayout();
+      } else if (this.isMapFullscreen) {
+        this.FullscreenMapLayout();
+      } else if (this.isWideSplitMode()) {
+        this.WideSplitLayout();
+      } else {
+        this.NarrowStackLayout();
+      }
+
+      // 搜索 overlay（顶部覆盖 HeaderSection）
+      if (this.isSearchVisible && !this.isWearableMode()) {
+        this.SearchOverlay();
+      }
+
+      // BottomSheet 遮罩
+      if (this.sheetVisible) {
+        this.SheetBackdrop();
+      }
+
+      // BottomSheet 内容（底部弹起）
+      if (this.sheetVisible) {
+        Column() {
+          this.BottomSheet(this.sheetItem);
+        }
+        .width('100%')
+        .height('100%')
+        .justifyContent(FlexAlign.End)
+      }
+    }
+    .width('100%')
+    .height('100%')
+  }
+
+  // ==================== wearable 极简布局（XS） ====================
+  @Builder
+  WearableLayout() {
     Column() {
-      this.HeaderSection()
-      this.StatsBar()
-      this.MapSection()
-      this.GreenhouseList()
+      // 简化 Header（只有标题）
+      Row() {
+        Text('🗺').fontSize(this.t().fontMd)
+        Text('大棚')
+          .fontSize(this.t().fontLg)
+          .fontColor(this.t().textTitle)
+          .fontWeight(FontWeight.Bold)
+          .margin({ left: 6 })
+        Blank()
+        Text(`${this.getFilteredGreenhouses().length}`)
+          .fontSize(this.t().fontSm)
+          .fontColor(this.t().textSub)
+      }
+      .width('100%')
+      .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+
+      // 紧凑列表（无地图、无统计条）
+      Scroll() {
+        Column() {
+          ForEach(this.getFilteredGreenhouses(), (item: GreenhouseLocation) => {
+            this.WearableListItem(item)
+          }, (item: GreenhouseLocation) => item.id)
+          Blank().height(40)
+        }.width('100%')
+      }
+      .layoutWeight(1)
+      .scrollBar(BarState.Auto)
     }
     .width('100%')
     .height('100%')
     .backgroundColor(this.t().bgPage)
   }
 
+  /** wearable 紧凑列表项（点击直接跳 DashboardPage） */
   @Builder
-  HeaderSection() {
-    Column() {
-      Row() {
-        Text('🗺').fontSize(this.t().fontXl)
-        Text('地图监控')
-          .fontSize(this.t().fontXxl)
+  WearableListItem(item: GreenhouseLocation) {
+    Row() {
+      Circle({ width: 8, height: 8 }).fill(this.getStatusColor(item.status))
+      Text(item.name)
+        .fontSize(this.t().fontSm)
+        .fontColor(this.t().textTitle)
+        .margin({ left: 8 })
+        .layoutWeight(1)
+      if (item.alerts > 0) {
+        Text(`${item.alerts}`)
+          .fontSize(this.t().fontXs)
           .fontColor(this.t().textWhite)
-          .fontWeight(FontWeight.Bold)
-          .margin({ left: 8 })
-        Blank()
-        Text(`${this.greenhouses.length} 个大棚`)
-          .fontSize(this.t().fontSm)
-          .fontColor(this.t().textWhiteSub)
+          .backgroundColor(this.t().warning)
+          .borderRadius(8)
+          .padding({ left: 4, right: 4, top: 1, bottom: 1 })
+      }
+    }
+    .width('100%')
+    .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+    .alignItems(VerticalAlign.Center)
+    .onClick(() => {
+      this.navigateToDashboard(item.id);
+    })
+  }
+
+  // ==================== 宽屏左右分栏布局（MD/LG/XL） ====================
+  @Builder
+  WideSplitLayout() {
+    Column() {
+      this.HeaderSection()
+      Row() {
+        // 左侧列表（40%）
+        Column() {
+          this.ListPanel()
+        }
+        .width('40%')
+        .height('100%')
+
+        // 右侧地图（60%）
+        Column() {
+          this.MapPanel()
+        }
+        .width('60%')
+        .height('100%')
       }
       .width('100%')
+      .layoutWeight(1)
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(this.t().bgPage)
+  }
 
-      // 搜索栏
+  // ==================== 窄屏上下分栏布局（SM） ====================
+  @Builder
+  NarrowStackLayout() {
+    Column() {
+      this.HeaderSection()
+      // 地图（40%）
+      Column() {
+        this.MapPanel()
+      }
+      .width('100%')
+      .height('40%')
+
+      // 列表（剩余）
+      Column() {
+        this.ListPanel()
+      }
+      .width('100%')
+      .layoutWeight(1)
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(this.t().bgPage)
+  }
+
+  // ==================== 地图全屏布局（点击 ↗ 触发） ====================
+  @Builder
+  FullscreenMapLayout() {
+    Stack() {
+      // 全屏地图（铺满）
+      MapViewComponent({
+        markers: this.toMapMarkers(),
+        centerLat: this.mapCenterLat,
+        centerLng: this.mapCenterLng,
+        mapHeight: 0,
+        colors: this.buildMapViewColors(),
+        isSatellite: this.isSatellite,
+        enableCluster: this.enableCluster,
+        enableMyLocation: this.enableMyLocation,
+        onMarkerClick: (id: string) => {
+          this.selectedId = id;
+          const item = this.findGreenhouseById(id);
+          if (item) {
+            this.sheetItem = item;
+            this.sheetVisible = true;
+          }
+        }
+      })
+        .width('100%')
+        .height('100%')
+
+      // 顶部浮层（返回按钮 + 控制按钮组）
       Row() {
-        Text('🔍').fontSize(this.t().fontMd)
+        Text('↙')
+          .fontSize(this.t().fontLg)
+          .fontColor(this.t().textWhite)
+          .width(36)
+          .height(36)
+          .textAlign(TextAlign.Center)
+          .backgroundColor(this.t().bgCardLight)
+          .backdropBlur(this.t().blurAmount)
+          .borderRadius(this.t().radiusFull)
+          .onClick(() => {
+            this.isMapFullscreen = false;
+          })
+        Blank()
+        this.MapControlButtons()
+      }
+      .width('100%')
+      .padding({ left: 12, right: 12, top: 12 })
+      .alignItems(VerticalAlign.Center)
+      .position({ x: 0, y: 0 })
+
+      // 底部 mini bar（点击恢复分栏）
+      Row() {
+        Text('📋').fontSize(this.t().fontLg)
+        Text(`查看大棚列表（${this.greenhouses.length}）`)
+          .fontSize(this.t().fontSm)
+          .fontColor(this.t().textTitle)
+          .margin({ left: 8 })
+          .layoutWeight(1)
+        Text('↙').fontSize(this.t().fontLg).fontColor(this.t().textHint)
+      }
+      .width('90%')
+      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+      .backgroundColor(this.t().bgCard)
+      .backdropBlur(this.t().blurAmount)
+      .borderRadius(this.t().radiusLg)
+      .border({ width: 1, color: this.t().borderLight })
+      .position({ x: '5%', y: '100%' })
+      .translate({ y: '-100%' })
+      .margin({ bottom: 16 })
+      .onClick(() => {
+        this.isMapFullscreen = false;
+      })
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(this.t().bgPage)
+  }
+
+  // ==================== Header（极简化：标题 + 统计 chip + 搜索图标） ====================
+  @Builder
+  HeaderSection() {
+    Row() {
+      Text('🗺').fontSize(this.t().fontLg)
+      Text('地图监控')
+        .fontSize(this.t().fontXxl)
+        .fontColor(this.t().textWhite)
+        .fontWeight(FontWeight.Bold)
+        .margin({ left: 8 })
+
+      Blank()
+
+      // 紧凑统计 chip：「10/12 在线 · 2 告警」
+      Text(this.getStatsSummary())
+        .fontSize(this.t().fontXs)
+        .fontColor(this.t().textWhite)
+        .backgroundColor(this.t().bgCardLight)
+        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+        .borderRadius(this.t().radiusFull)
+
+      // 搜索图标按钮（点击展开搜索 overlay）
+      Text('🔍')
+        .fontSize(this.t().fontLg)
+        .fontColor(this.t().textWhite)
+        .width(32)
+        .height(32)
+        .textAlign(TextAlign.Center)
+        .margin({ left: 8 })
+        .onClick(() => {
+          this.isSearchVisible = true;
+        })
+    }
+    .width('100%')
+    .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+    .alignItems(VerticalAlign.Center)
+    .linearGradient({
+      angle: 135,
+      colors: [[this.t().headerGradientTop, 0.0], [this.t().headerGradientBottom, 1.0]]
+    })
+  }
+
+  /** 搜索 overlay（点击 Header 搜索图标触发，顶部覆盖） */
+  @Builder
+  SearchOverlay() {
+    Column() {
+      Row() {
+        Text('✕')
+          .fontSize(this.t().fontLg)
+          .fontColor(this.t().textWhite)
+          .width(32)
+          .height(32)
+          .textAlign(TextAlign.Center)
+          .onClick(() => {
+            this.isSearchVisible = false;
+            this.searchKeyword = '';
+          })
+        Text('🔍').fontSize(this.t().fontMd).margin({ left: 4 })
         TextInput({ text: this.searchKeyword, placeholder: '搜索大棚名称' })
           .fontSize(this.t().fontMd)
           .fontColor(this.t().textTitle)
@@ -114,54 +445,112 @@ export struct MapPage {
           .margin({ left: 8 })
           .height(36)
           .padding({ left: 10, right: 10 })
-          .onChange((value: string) => { this.searchKeyword = value; })
+          .onChange((value: string) => {
+            this.searchKeyword = value;
+            this.onSearchChange(value);
+          })
       }
       .width('100%')
-      .margin({ top: 10 })
+      .padding({ left: 16, right: 16, top: 12, bottom: 12 })
       .alignItems(VerticalAlign.Center)
+      .linearGradient({
+        angle: 135,
+        colors: [[this.t().headerGradientTop, 0.0], [this.t().headerGradientBottom, 1.0]]
+      })
     }
     .width('100%')
-    .padding({ left: 16, right: 16, top: 12, bottom: 12 })
-    .linearGradient({
-      angle: 135,
-      colors: [[this.t().headerGradientTop, 0.0], [this.t().headerGradientBottom, 1.0]]
-    })
+    .alignItems(HorizontalAlign.Start)
   }
 
+  /** 状态筛选 chip */
   @Builder
-  StatsBar() {
-    Row() {
-      Column() {
-        Text(`${this.greenhouses.length}`)
-          .fontSize(this.t().fontXl).fontColor(this.t().textTitle).fontWeight(FontWeight.Bold)
-        Text('大棚总数').fontSize(this.t().fontSm).fontColor(this.t().textSub).margin({ top: 2 })
-      }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-      Divider().vertical(true).height(28).color(this.t().borderLight)
-      Column() {
-        Text(`${this.getOnlineCount()}`)
-          .fontSize(this.t().fontXl).fontColor(this.t().success).fontWeight(FontWeight.Bold)
-        Text('在线大棚').fontSize(this.t().fontSm).fontColor(this.t().textSub).margin({ top: 2 })
-      }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-      Divider().vertical(true).height(28).color(this.t().borderLight)
-      Column() {
-        Text(`${this.getAlertGreenhouses()}`)
-          .fontSize(this.t().fontXl).fontColor(this.t().warning).fontWeight(FontWeight.Bold)
-        Text('告警大棚').fontSize(this.t().fontSm).fontColor(this.t().textSub).margin({ top: 2 })
-      }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-      Divider().vertical(true).height(28).color(this.t().borderLight)
-      Column() {
-        Text(`${this.getTotalSensors()}`)
-          .fontSize(this.t().fontXl).fontColor(this.t().info).fontWeight(FontWeight.Bold)
-        Text('传感器总数').fontSize(this.t().fontSm).fontColor(this.t().textSub).margin({ top: 2 })
-      }.layoutWeight(1).alignItems(HorizontalAlign.Center)
+  StatusFilterChip(opt: StatusFilterOption) {
+    Text(opt.label)
+      .fontSize(this.t().fontXs)
+      .fontColor(this.statusFilter === opt.value ? this.t().textOnPrimary : this.t().textWhiteSub)
+      .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+      .margin({ right: 6 })
+      .backgroundColor(this.statusFilter === opt.value ? this.t().primary : this.t().bgCardLight)
+      .borderRadius(this.t().radiusFull)
+      .onClick(() => {
+        this.statusFilter = opt.value;
+      })
+  }
+
+  // ==================== 地图面板（含底部浮层按钮） ====================
+  @Builder
+  MapPanel() {
+    Column() {
+      Stack({ alignContent: Alignment.Bottom }) {
+        MapViewComponent({
+          markers: this.toMapMarkers(),
+          centerLat: this.mapCenterLat,
+          centerLng: this.mapCenterLng,
+          mapHeight: this.getMapHeight(),
+          colors: this.buildMapViewColors(),
+          isSatellite: this.isSatellite,
+          enableCluster: this.enableCluster,
+          enableMyLocation: this.enableMyLocation,
+          onMarkerClick: (id: string) => {
+            this.selectedId = id;
+            const item = this.findGreenhouseById(id);
+            if (item) {
+              this.sheetItem = item;
+              this.sheetVisible = true;
+            }
+          }
+        })
+          .width('100%')
+          .height('100%')
+          .borderRadius(this.t().radiusLg)
+          .clip(true)
+          .backgroundColor(this.t().bgCardLight)
+
+        // 浮层控制按钮组（底部横排，wearable 不显示）
+        if (!this.isWearableMode()) {
+          Row() {
+            this.MapControlButtons()
+          }
+          .margin({ bottom: 12 })
+        }
+      }
+      .width('100%')
+      .height('100%')
     }
     .width('100%')
-    .padding({ top: 14, bottom: 14 })
-    .backgroundColor(this.t().bgCard)
+    .height('100%')
+    .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+  }
+
+  /**
+   * 地图浮层控制按钮组（底部横排，4 个按钮）
+   *
+   *   - 🛰 卫星图切换（isSatellite）
+   *   - 🔵 标记聚合 Cluster（enableCluster）
+   *   - 📍 我的位置（enableMyLocation）
+   *   - ↗  全屏切换（isMapFullscreen）
+   */
+  @Builder
+  MapControlButtons() {
+    Row() {
+      this.MapControlButton('🛰', this.isSatellite, () => {
+        this.isSatellite = !this.isSatellite;
+      })
+      this.MapControlButton('🔵', this.enableCluster, () => {
+        this.enableCluster = !this.enableCluster;
+      })
+      this.MapControlButton('📍', this.enableMyLocation, () => {
+        this.onLocationToggle();
+      })
+      this.MapControlButton(this.isMapFullscreen ? '↙' : '↗', this.isMapFullscreen, () => {
+        this.isMapFullscreen = !this.isMapFullscreen;
+      })
+    }
+    .padding({ left: 6, right: 6, top: 4, bottom: 4 })
+    .backgroundColor(this.t().bgCardLight)
     .backdropBlur(this.t().blurAmount)
-    .border({ width: 1, color: this.t().border })
-    .borderRadius(this.t().radiusLg)
-    .margin({ top: 10, left: 12, right: 12 })
+    .borderRadius(this.t().radiusFull)
+    .border({ width: 1, color: this.t().borderLight })
     .shadow({
       radius: this.t().shadowCardRadius,
       color: this.t().shadowCardColor,
@@ -170,179 +559,399 @@ export struct MapPage {
     })
   }
 
-  // ==================== 地图区域（Map Kit 自动切换） ====================
+  /** 单个圆形控制按钮 */
   @Builder
-  MapSection() {
-    Stack({ alignContent: Alignment.Bottom }) {
-      MapViewComponent({
-        markers: this.toMapMarkers(),
-        centerLat: this.mapCenterLat,
-        centerLng: this.mapCenterLng,
-        zoomLevel: 13,
-        mapHeight: 320,
-        onMarkerClick: (id: string) => {
-          this.selectedId = id;
-        }
-      })
-        .width('100%')
-        .height(320)
-        .borderRadius(this.t().radiusLg)
-        .clip(true)
-        .backgroundColor(this.t().bgCardLight)
-
-      // 底部详情卡片
-      this.DetailCard(this.getSelectedGreenhouse())
-    }
-    .width('100%')
-    .margin({ top: 10, left: 12, right: 12 })
+  MapControlButton(icon: string, isOn: boolean, action: () => void) {
+    Text(icon)
+      .fontSize(this.t().fontLg)
+      .fontColor(isOn ? this.t().textOnPrimary : this.t().textTitle)
+      .width(36)
+      .height(36)
+      .textAlign(TextAlign.Center)
+      .backgroundColor(isOn ? this.t().primary : this.t().bgCard)
+      .borderRadius(this.t().radiusFull)
+      .margin({ top: 4, bottom: 4 })
+      .onClick(() => { action(); })
   }
 
-  // ==================== 选中大棚详情卡片 ====================
-  @Builder
-  DetailCard(item: GreenhouseLocation) {
-    if (item.id !== '') {
-      Column() {
-        Row() {
-          Column() {
-            Text(item.name)
-              .fontSize(this.t().fontLg).fontColor(this.t().textTitle).fontWeight(FontWeight.Bold)
-            Row() {
-              Circle({ width: 6, height: 6 }).fill(this.getStatusColor(item.status))
-              Text(item.status)
-                .fontSize(this.t().fontXs).fontColor(this.getStatusColor(item.status)).margin({ left: 4 })
-            }.margin({ top: 4 }).alignItems(VerticalAlign.Center)
-          }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-
-          Text('查看详情')
-            .fontSize(this.t().fontSm).fontColor(this.t().textOnPrimary)
-            .padding({ left: 10, right: 10, top: 6, bottom: 6 })
-            .backgroundColor(this.t().primary).borderRadius(this.t().radiusSm)
-            .onClick(() => { /* TODO: AppRouter 接入大棚详情页 */ })
-        }.width('100%').alignItems(VerticalAlign.Top)
-
-        Row() {
-          Column() {
-            Text(`${item.sensors}`).fontSize(this.t().fontMd).fontColor(this.t().info).fontWeight(FontWeight.Bold)
-            Text('传感器').fontSize(this.t().fontXs).fontColor(this.t().textSub)
-          }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-          Column() {
-            Text(`${item.alerts}`)
-              .fontSize(this.t().fontMd).fontColor(item.alerts > 0 ? this.t().warning : this.t().textSub).fontWeight(FontWeight.Bold)
-            Text('告警').fontSize(this.t().fontXs).fontColor(this.t().textSub)
-          }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-          Column() {
-            Text(`${item.devices}`).fontSize(this.t().fontMd).fontColor(this.t().textBody).fontWeight(FontWeight.Bold)
-            Text('设备').fontSize(this.t().fontXs).fontColor(this.t().textSub)
-          }.layoutWeight(1).alignItems(HorizontalAlign.Center)
-        }.width('100%').margin({ top: 10 })
-
-        Row() {
-          Column() {
-            Text('🌡 温度').fontSize(this.t().fontXs).fontColor(this.t().textSub)
-            Row() {
-              Text(item.status === '离线' ? '--' : `${item.temp.toFixed(1)}`)
-                .fontSize(this.t().fontLg).fontColor(this.t().textTitle).fontWeight(FontWeight.Bold)
-              Text('°C').fontSize(this.t().fontSm).fontColor(this.t().textSub).margin({ left: 2 })
-            }.margin({ top: 4 }).alignItems(VerticalAlign.Bottom)
-          }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-          Column() {
-            Text('💧 湿度').fontSize(this.t().fontXs).fontColor(this.t().textSub)
-            Row() {
-              Text(item.status === '离线' ? '--' : `${item.humidity.toFixed(0)}`)
-                .fontSize(this.t().fontLg).fontColor(this.t().textTitle).fontWeight(FontWeight.Bold)
-              Text('%').fontSize(this.t().fontSm).fontColor(this.t().textSub).margin({ left: 2 })
-            }.margin({ top: 4 }).alignItems(VerticalAlign.Bottom)
-          }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-        }.width('100%').padding({ top: 10 })
-        .border({ width: { top: 1 }, color: this.t().borderLight }).margin({ top: 10 })
+  /** 定位按钮点击处理（首次开启时提示用户授权） */
+  private onLocationToggle(): void {
+    this.enableMyLocation = !this.enableMyLocation;
+    if (this.enableMyLocation) {
+      try {
+        promptAction.showToast({
+          message: '已开启"我的位置"按钮，若未显示定位点请在系统设置授权定位权限',
+          duration: 3000
+        });
+      } catch (e) {
+        Logger.warn(TAG, `Toast 显示失败: ${JSON.stringify(e)}`);
       }
-      .width('100%').padding(12)
-      .backgroundColor(this.t().bgCard)
-      .borderRadius({ topLeft: this.t().radiusLg, topRight: this.t().radiusLg })
-      .shadow({
-        radius: this.t().shadowFloatRadius,
-        color: this.t().shadowFloatColor,
-        offsetX: 0,
-        offsetY: this.t().shadowFloatOffsetY
-      })
     }
   }
 
-  // ==================== 大棚列表 ====================
+  /** 地图高度（宽屏填满，窄屏固定） */
+  private getMapHeight(): number {
+    // 宽屏填满父容器，传 0 让组件用 height('100%')
+    // 窄屏由父容器 height('40%') 控制
+    return 0;
+  }
+
+  // ==================== 列表面板（顶部状态筛选 + 告警排序 icon） ====================
   @Builder
-  GreenhouseList() {
+  ListPanel() {
     Column() {
+      // 状态筛选 Tab 行（横向可滚动，避免窄屏挤压）
+      Scroll() {
+        Row() {
+          ForEach(this.getStatusFilterOptions(), (opt: StatusFilterOption) => {
+            this.StatusFilterChip(opt)
+          }, (opt: StatusFilterOption) => opt.value)
+          Blank()
+          // 告警排序 icon Toggle
+          Text('⚠')
+            .fontSize(this.t().fontSm)
+            .fontColor(this.alertSortEnabled ? this.t().warning : this.t().textSub)
+            .width(28)
+            .height(28)
+            .textAlign(TextAlign.Center)
+            .backgroundColor(this.alertSortEnabled ? this.t().bgCardLight : Color.Transparent)
+            .borderRadius(this.t().radiusFull)
+            .margin({ left: 8 })
+            .onClick(() => {
+              this.alertSortEnabled = !this.alertSortEnabled;
+            })
+        }
+        .width('100%')
+      }
+      .scrollable(ScrollDirection.Horizontal)
+      .scrollBar(BarState.Off)
+      .width('100%')
+      .padding({ left: 12, right: 12, top: 8, bottom: 4 })
+
+      // 列表标题
       Row() {
-        Text('大棚列表').fontSize(this.t().fontLg).fontColor(this.t().textTitle).fontWeight(FontWeight.Bold)
+        Text('大棚列表').fontSize(this.t().fontMd).fontColor(this.t().textTitle).fontWeight(FontWeight.Bold)
         Blank()
         Text(`${this.getFilteredGreenhouses().length} / ${this.greenhouses.length}`)
-          .fontSize(this.t().fontSm).fontColor(this.t().textSub)
-      }.width('100%').margin({ bottom: 10 }).alignItems(VerticalAlign.Center)
+          .fontSize(this.t().fontSm)
+          .fontColor(this.t().textSub)
+      }
+      .width('100%')
+      .padding({ left: 12, right: 12, top: 4, bottom: 6 })
+      .alignItems(VerticalAlign.Center)
 
+      // 可滚动列表
       Scroll() {
         Column() {
           ForEach(this.getFilteredGreenhouses(), (item: GreenhouseLocation) => {
             this.GreenhouseCard(item)
           }, (item: GreenhouseLocation) => item.id)
-          Blank().height(80)
-        }.width('100%')
-      }.layoutWeight(1).scrollBar(BarState.Auto)
+          Blank().height(60)
+        }
+        .width('100%')
+      }
+      .layoutWeight(1)
+      .scrollBar(BarState.Auto)
+      .padding({ left: 12, right: 12 })
     }
-    .width('100%').layoutWeight(1)
-    .padding({ left: 12, right: 12, top: 12 })
+    .width('100%')
+    .height('100%')
   }
 
+  /** 大棚卡片（紧凑版：点击触发 BottomSheet 详情，不再内联展开） */
   @Builder
   GreenhouseCard(item: GreenhouseLocation) {
     Row() {
+      // 状态指示点
       Circle({ width: 10, height: 10 })
         .fill(this.getStatusColor(item.status))
         .border({ width: 2, color: this.t().textWhite })
 
+      // 名称 + 状态
       Column() {
         Text(item.name)
           .fontSize(this.t().fontMd)
           .fontColor(item.id === this.selectedId ? this.t().primary : this.t().textTitle)
           .fontWeight(FontWeight.Medium)
         Text(item.status)
-          .fontSize(this.t().fontXs).fontColor(this.getStatusColor(item.status)).margin({ top: 4 })
-      }.alignItems(HorizontalAlign.Start).layoutWeight(1).margin({ left: 10 })
+          .fontSize(this.t().fontXs)
+          .fontColor(this.getStatusColor(item.status))
+          .margin({ top: 4 })
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+      .margin({ left: 10 })
 
-      Column() {
-        Text(`${item.sensors}`).fontSize(this.t().fontLg).fontColor(this.t().info).fontWeight(FontWeight.Bold)
-        Text('传感器').fontSize(this.t().fontXs).fontColor(this.t().textSub)
-      }.margin({ right: 16 }).alignItems(HorizontalAlign.Center)
-
-      Column() {
+      // 告警徽标（无告警时不占位）
+      if (item.alerts > 0) {
         Text(`${item.alerts}`)
-          .fontSize(this.t().fontLg).fontColor(item.alerts > 0 ? this.t().warning : this.t().textSub).fontWeight(FontWeight.Bold)
-        Text('告警').fontSize(this.t().fontXs).fontColor(this.t().textSub)
-      }.alignItems(HorizontalAlign.Center)
+          .fontSize(this.t().fontXs)
+          .fontColor(this.t().textWhite)
+          .backgroundColor(this.t().warning)
+          .borderRadius(this.t().radiusFull)
+          .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+          .margin({ right: 8 })
+      }
 
-      // 经纬度坐标展示
-      Text(`📍`)
-        .fontSize(this.t().fontXs).fontColor(this.t().textHint)
+      // 进入详情箭头
+      Text('›')
+        .fontSize(this.t().fontXl)
+        .fontColor(this.t().textHint)
     }
-    .width('100%').padding(14).alignItems(VerticalAlign.Center)
+    .width('100%')
+    .padding(14)
+    .alignItems(VerticalAlign.Center)
     .backgroundColor(item.id === this.selectedId ? this.t().bgCardLight : this.t().bgCard)
     .backdropBlur(this.t().blurAmount)
     .borderRadius(this.t().radiusMd)
     .margin({ bottom: 8 })
-    .border({ width: item.id === this.selectedId ? 1.5 : 0, color: item.id === this.selectedId ? this.t().primary : 'transparent' })
+    .border({
+      width: item.id === this.selectedId ? 1.5 : 1,
+      color: item.id === this.selectedId ? this.t().primary : this.t().borderLight
+    })
     .shadow({
       radius: this.t().shadowCardRadius,
       color: this.t().shadowCardColor,
       offsetX: 0,
       offsetY: this.t().shadowCardOffsetY
     })
-    .onClick(() => { this.selectedId = item.id; })
+    .onClick(() => {
+      // 点击列表项 → 弹起 BottomSheet 详情
+      this.selectedId = item.id;
+      this.sheetItem = item;
+      this.sheetVisible = true;
+    })
+  }
+
+  /** BottomSheet 遮罩（点击关闭） */
+  @Builder
+  SheetBackdrop() {
+    Column()
+      .width('100%')
+      .height('100%')
+      .backgroundColor('#80000000')
+      .onClick(() => {
+        this.closeSheet();
+      })
+  }
+
+  /** BottomSheet 半屏详情（点击列表项或地图 marker 触发） */
+  @Builder
+  BottomSheet(item: GreenhouseLocation) {
+    Column() {
+      // 拖拽指示器
+      Row()
+        .width(40)
+        .height(4)
+        .backgroundColor(this.t().textHint)
+        .borderRadius(2)
+        .margin({ top: 12, bottom: 12 })
+
+      // 标题行：状态点 + 名称 + 关闭按钮
+      Row() {
+        Circle({ width: 10, height: 10 })
+          .fill(this.getStatusColor(item.status))
+          .border({ width: 2, color: this.t().textWhite })
+        Text(item.name)
+          .fontSize(this.t().fontXxl)
+          .fontColor(this.t().textTitle)
+          .fontWeight(FontWeight.Bold)
+          .margin({ left: 8 })
+          .layoutWeight(1)
+        Text('✕')
+          .fontSize(this.t().fontLg)
+          .fontColor(this.t().textHint)
+          .onClick(() => {
+            this.closeSheet();
+          })
+      }
+      .width('100%')
+      .padding({ left: 20, right: 20 })
+      .alignItems(VerticalAlign.Center)
+
+      // 状态标签
+      Text(item.status)
+        .fontSize(this.t().fontXs)
+        .fontColor(this.t().textWhite)
+        .backgroundColor(this.getStatusColor(item.status))
+        .padding({ left: 8, right: 8, top: 4, bottom: 4 })
+        .borderRadius(this.t().radiusFull)
+        .margin({ top: 8, left: 20 })
+        .alignSelf(ItemAlign.Start)
+
+      // 统计三列
+      Row() {
+        Column() {
+          Text(`${item.sensors}`).fontSize(this.t().fontMd).fontColor(this.t().info).fontWeight(FontWeight.Bold)
+          Text('传感器').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+        }.layoutWeight(1).alignItems(HorizontalAlign.Center)
+        Column() {
+          Text(`${item.devices}`).fontSize(this.t().fontMd).fontColor(this.t().textBody).fontWeight(FontWeight.Bold)
+          Text('设备').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+        }.layoutWeight(1).alignItems(HorizontalAlign.Center)
+        Column() {
+          Text(`${item.alerts}`)
+            .fontSize(this.t().fontMd)
+            .fontColor(item.alerts > 0 ? this.t().warning : this.t().textSub)
+            .fontWeight(FontWeight.Bold)
+          Text('告警').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+        }.layoutWeight(1).alignItems(HorizontalAlign.Center)
+      }
+      .width('100%')
+      .padding({ top: 16, bottom: 16, left: 20, right: 20 })
+      .border({ width: { top: 1, bottom: 1 }, color: this.t().borderLight })
+
+      // 温湿度
+      Row() {
+        Column() {
+          Text('🌡 温度').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+          Row() {
+            Text(item.status === '离线' ? '--' : `${item.temp.toFixed(1)}`)
+              .fontSize(this.t().fontLg)
+              .fontColor(this.t().textTitle)
+              .fontWeight(FontWeight.Bold)
+            Text('°C').fontSize(this.t().fontSm).fontColor(this.t().textSub).margin({ left: 2 })
+          }
+          .margin({ top: 4 })
+          .alignItems(VerticalAlign.Bottom)
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+
+        Column() {
+          Text('💧 湿度').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+          Row() {
+            Text(item.status === '离线' ? '--' : `${item.humidity.toFixed(0)}`)
+              .fontSize(this.t().fontLg)
+              .fontColor(this.t().textTitle)
+              .fontWeight(FontWeight.Bold)
+            Text('%').fontSize(this.t().fontSm).fontColor(this.t().textSub).margin({ left: 2 })
+          }
+          .margin({ top: 4 })
+          .alignItems(VerticalAlign.Bottom)
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+      }
+      .width('100%')
+      .padding({ top: 12, bottom: 16, left: 20, right: 20 })
+
+      // 经纬度
+      Text(`📍 ${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}`)
+        .fontSize(this.t().fontXs)
+        .fontColor(this.t().textHint)
+        .padding({ left: 20, right: 20, bottom: 12 })
+
+      // 查看完整详情按钮
+      Text('查看完整详情')
+        .fontSize(this.t().fontSm)
+        .fontColor(this.t().textOnPrimary)
+        .backgroundColor(this.t().primary)
+        .borderRadius(this.t().radiusSm)
+        .padding({ left: 16, right: 16, top: 10, bottom: 10 })
+        .margin({ left: 20, right: 20, bottom: 20 })
+        .alignSelf(ItemAlign.Stretch)
+        .textAlign(TextAlign.Center)
+        .onClick(() => {
+          this.closeSheet();
+          this.navigateToDashboard(item.id);
+        })
+    }
+    .width('100%')
+    .height('55%')
+    .backgroundColor(this.t().bgCard)
+    .borderRadius({ topLeft: 20, topRight: 20 })
+    .shadow({
+      radius: this.t().shadowCardRadius * 2,
+      color: this.t().shadowCardColor,
+      offsetX: 0,
+      offsetY: -2
+    })
   }
 
   // ============ 辅助方法 ============
 
+  /** 状态筛选选项 */
+  private getStatusFilterOptions(): StatusFilterOption[] {
+    const options: StatusFilterOption[] = [
+      { label: '全部', value: 'all' },
+      { label: '正常', value: 'normal' },
+      { label: '告警', value: 'alert' },
+      { label: '离线', value: 'offline' }
+    ];
+    return options;
+  }
+
+  /** 按筛选 + 搜索 + 排序获取列表 */
   private getFilteredGreenhouses(): GreenhouseLocation[] {
-    if (this.searchKeyword.length === 0) { return this.greenhouses; }
-    return this.greenhouses.filter((g: GreenhouseLocation) => g.name.indexOf(this.searchKeyword) >= 0);
+    let list: GreenhouseLocation[] = [];
+
+    // 1. 状态筛选
+    for (let i = 0; i < this.greenhouses.length; i++) {
+      const g = this.greenhouses[i];
+      if (this.matchesStatusFilter(g, this.statusFilter)) {
+        list.push(g);
+      }
+    }
+
+    // 2. 关键词搜索
+    if (this.searchKeyword.length > 0) {
+      const filtered: GreenhouseLocation[] = [];
+      for (let i = 0; i < list.length; i++) {
+        if (list[i].name.indexOf(this.searchKeyword) >= 0) {
+          filtered.push(list[i]);
+        }
+      }
+      list = filtered;
+    }
+
+    // 3. 告警排序（降序）
+    if (this.alertSortEnabled) {
+      list.sort((a: GreenhouseLocation, b: GreenhouseLocation) => {
+        return b.alerts - a.alerts;
+      });
+    }
+
+    return list;
+  }
+
+  /** 判断大棚是否匹配状态筛选 */
+  private matchesStatusFilter(g: GreenhouseLocation, filter: StatusFilter): boolean {
+    if (filter === 'all') {
+      return true;
+    }
+    if (filter === 'normal') {
+      return g.status === '运行正常';
+    }
+    if (filter === 'offline') {
+      return g.status === '离线';
+    }
+    // alert：既非正常也非离线
+    return g.status !== '运行正常' && g.status !== '离线';
+  }
+
+  /** 搜索关键词变化时联动地图（高亮首个匹配项） */
+  private onSearchChange(keyword: string): void {
+    if (keyword.length === 0) {
+      return;
+    }
+    const filtered = this.getFilteredGreenhouses();
+    if (filtered.length > 0) {
+      this.selectedId = filtered[0].id;
+    }
+  }
+
+  /** 跳转 DashboardPage（传 greenhouseId 占位） */
+  private navigateToDashboard(greenhouseId: string): void {
+    try {
+      const stack = AppStorage.get<NavPathStack>('navPathStack');
+      if (stack) {
+        const param: GreenhouseNavParam = { greenhouseId: greenhouseId };
+        stack.pushPath({ name: 'DashboardPage', param: param });
+      }
+    } catch (err) {
+      Logger.warn(TAG, `路由跳转失败: ${JSON.stringify(err)}`);
+    }
   }
 
   private getStatusColor(status: string): string {
@@ -373,10 +982,33 @@ export struct MapPage {
     return count;
   }
 
-  private getSelectedGreenhouse(): GreenhouseLocation {
-    for (let i = 0; i < this.greenhouses.length; i++) {
-      if (this.greenhouses[i].id === this.selectedId) { return this.greenhouses[i]; }
-    }
-    return { id: '', name: '', status: '', sensors: 0, alerts: 0, devices: 0, temp: 0, humidity: 0, lat: 0, lng: 0 };
+  /** 关闭 BottomSheet 并清空当前展示项 */
+  private closeSheet(): void {
+    this.sheetVisible = false;
+    this.sheetItem = MapPage.EMPTY_GREENHOUSE;
   }
+
+  /** 根据 id 查找大棚数据（找不到返回 null） */
+  private findGreenhouseById(id: string): GreenhouseLocation | null {
+    for (let i = 0; i < this.greenhouses.length; i++) {
+      if (this.greenhouses[i].id === id) {
+        return this.greenhouses[i];
+      }
+    }
+    return null;
+  }
+
+  /** 生成 Header chip 用的紧凑统计文案：「10/12 在线 · 2 告警」 */
+  private getStatsSummary(): string {
+    const total: number = this.greenhouses.length;
+    const online: number = this.getOnlineCount();
+    const alerts: number = this.getAlertGreenhouses();
+    return `${online}/${total} 在线 · ${alerts} 告警`;
+  }
+}
+
+/** 状态筛选选项接口 */
+interface StatusFilterOption {
+  label: string;
+  value: StatusFilter;
 }

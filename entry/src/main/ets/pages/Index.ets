@@ -252,6 +252,9 @@ struct Index {
       GrowthPage()
     } else if (name === 'RecipePage') {
       RecipePage()
+    } else if (name === 'DashboardPage') {
+      // 复用 DashboardPage 作为大棚详情占位（MapPage "查看详情"跳转目标）
+      DashboardPage()
     }
   }
 
