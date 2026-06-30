@@ -5,13 +5,13 @@
         "name": "default",
         "type": "HarmonyOS",
         "material": {
-          "certpath": "C:\\Users\\18526\\.ohos\\config\\default_Smart-Mushroom-HarmonyOS-Terminal-Code_iDCNipPs0CR4hGW8Ni5ZPdfbY06FRr_0duPlIi9PHRw=.cer",
-          "keyAlias": "debugKey",
-          "keyPassword": "0000001BC3C38118C923BDADAE2265EE588F39576EBCFAE3EE2CF28EDF46A1160056DDDFE20D5107EADD53",
-          "profile": "C:\\Users\\18526\\.ohos\\config\\default_Smart-Mushroom-HarmonyOS-Terminal-Code_iDCNipPs0CR4hGW8Ni5ZPdfbY06FRr_0duPlIi9PHRw=.p7b",
+          "storeFile": "D:/SoftwareAction/.ohos/config/softwareaction.p12",
+          "storePassword": "000000192DEEC5BCF19A4E70476A50DCCDA86CD4BED1F04BB5C4FC97F3B534785C0385D84FF64D44F7",
+          "keyAlias": "softwareaction",
+          "keyPassword": "0000001968004F370DA43AE5EDAF7A6C55CCE05AA986C370727FB2669AE66D6606770709E70AECCFF7",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\18526\\.ohos\\config\\default_Smart-Mushroom-HarmonyOS-Terminal-Code_iDCNipPs0CR4hGW8Ni5ZPdfbY06FRr_0duPlIi9PHRw=.p12",
-          "storePassword": "0000001B2EC299EA6E8116B249DCC76D56969DAAC2F4A85D1D66BBC6FACE9D1BEF93FAA1FF40356EFAC7A2"
+          "profile": "D:/SoftwareAction/.ohos/config/softwareaction_debugDebug.p7b",
+          "certpath": "D:/SoftwareAction/.ohos/config/softwareaction_debug.cer"
         }
       }
     ],
