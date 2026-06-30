@@ -1011,9 +1011,11 @@ export struct MapPage {
   }
 
   private getOnlineCount(): number {
+    // IoT 离线时只有真实设备在线才是真在线，其余都是假数据
+    if (!this.iotCheckDone || !this.isIotOnline) { return 0; }
     let count: number = 0;
     for (let i = 0; i < this.greenhouses.length; i++) {
-      if (this.greenhouses[i].status !== '离线') { count += 1; }
+      if (this.greenhouses[i].status !== '离线' && this.greenhouses[i].status !== 'IoT未连接') { count += 1; }
     }
     return count;
   }
@@ -1044,13 +1046,15 @@ export struct MapPage {
 
   /** 生成 Header chip 用的紧凑统计文案：「10/12 在线 · 2 告警」 */
   private getStatsSummary(): string {
-    const total: number = this.greenhouses.length;
-    const alerts: number = this.getAlertGreenhouses();
     if (!this.iotCheckDone) {
-      return `检测中... · ${alerts} 告警`;
+      return `检测中...`;
     }
-    const iotStatus: string = this.isIotOnline ? '🟢 设备在线' : '🔴 设备离线';
-    return `${iotStatus} · ${alerts} 告警`;
+    if (!this.isIotOnline) {
+      return `🔴 IoT 离线 · 无真实数据`;
+    }
+    const online: number = this.getOnlineCount();
+    const alerts: number = this.getAlertGreenhouses();
+    return `🟢 IoT 在线 · ${online}台 · ${alerts} 告警`;
   }
 }
 
