@@ -155,7 +155,7 @@ export struct MapPage {
     this.checkIotStatus();
   }
 
-  /** 检测 IoT 设备连接状态 */
+  /** 检测 IoT 设备连接状态，同步更新大棚状态 */
   private async checkIotStatus(): Promise<void> {
     try {
       this.isIotOnline = await IotService.getInstance().isDeviceOnline();
@@ -165,6 +165,31 @@ export struct MapPage {
       Logger.warn(TAG, `IoT 检测失败: ${JSON.stringify(e)}`);
     }
     this.iotCheckDone = true;
+    // 根据真实 IoT 状态更新大棚数据
+    this.applyIotStatus();
+  }
+
+  /** 把 IoT 在线状态写进大棚数据 */
+  private applyIotStatus(): void {
+    const updated: GreenhouseLocation[] = [];
+    for (let i = 0; i < this.greenhouses.length; i++) {
+      const g = this.greenhouses[i];
+      // 1号大棚对应真实 IoT 设备
+      if (g.id === '1') {
+        const newStatus = this.isIotOnline ? '运行正常' : 'IoT未连接';
+        updated.push({
+          id: g.id, name: g.name, status: newStatus,
+          sensors: this.isIotOnline ? g.sensors : 0,
+          alerts: g.alerts, devices: g.devices,
+          temp: this.isIotOnline ? g.temp : 0,
+          humidity: this.isIotOnline ? g.humidity : 0,
+          lat: g.lat, lng: g.lng
+        });
+      } else {
+        updated.push(g);
+      }
+    }
+    this.greenhouses = updated;
   }
 
   build() {
