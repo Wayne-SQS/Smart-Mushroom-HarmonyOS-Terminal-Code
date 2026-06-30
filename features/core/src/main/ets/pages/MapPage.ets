@@ -2,6 +2,7 @@ import { MapViewComponent, MapMarker, MapViewColors, BreakpointConstants, Adapti
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeTokens } from '../theme/ThemeTokens';
 import { Logger } from 'common-base';
+import { IotService } from '../service/IotService';
 import promptAction from '@ohos.promptAction';
 
 const TAG = 'MapPage';
@@ -86,6 +87,8 @@ export struct MapPage {
   @State isSearchVisible: boolean = false;    // 搜索 overlay 浮层可见性
   @State sheetVisible: boolean = false;       // 详情 BottomSheet 可见性
   @State sheetItem: GreenhouseLocation = MapPage.EMPTY_GREENHOUSE;  // BottomSheet 当前展示的大棚
+  @State isIotOnline: boolean = false;        // IoT 设备连接状态
+  @State iotCheckDone: boolean = false;       // IoT 检测是否完成
 
   /** 空哨兵对象，避免 sheetItem 为 null 触发类型断言 */
   private static readonly EMPTY_GREENHOUSE: GreenhouseLocation = {
@@ -146,6 +149,22 @@ export struct MapPage {
       labelBg: tk.textTitle,
       labelText: tk.textWhite
     };
+  }
+
+  aboutToAppear(): void {
+    this.checkIotStatus();
+  }
+
+  /** 检测 IoT 设备连接状态 */
+  private async checkIotStatus(): Promise<void> {
+    try {
+      this.isIotOnline = await IotService.getInstance().isDeviceOnline();
+      Logger.info(TAG, `IoT 设备在线状态: ${this.isIotOnline}`);
+    } catch (e) {
+      this.isIotOnline = false;
+      Logger.warn(TAG, `IoT 检测失败: ${JSON.stringify(e)}`);
+    }
+    this.iotCheckDone = true;
   }
 
   build() {
@@ -1001,9 +1020,12 @@ export struct MapPage {
   /** 生成 Header chip 用的紧凑统计文案：「10/12 在线 · 2 告警」 */
   private getStatsSummary(): string {
     const total: number = this.greenhouses.length;
-    const online: number = this.getOnlineCount();
     const alerts: number = this.getAlertGreenhouses();
-    return `${online}/${total} 在线 · ${alerts} 告警`;
+    if (!this.iotCheckDone) {
+      return `检测中... · ${alerts} 告警`;
+    }
+    const iotStatus: string = this.isIotOnline ? '🟢 设备在线' : '🔴 设备离线';
+    return `${iotStatus} · ${alerts} 告警`;
   }
 }
 
