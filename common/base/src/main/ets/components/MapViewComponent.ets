@@ -149,7 +149,7 @@ export struct MapViewComponent {
           Text(' 500m').fontSize(10).fontColor(this.c('metaText', '#999'))
         }.alignItems(VerticalAlign.Center).position({ x: 10, y: 8 })
         Row() {
-          Text('📍 Canvas 降级地图').fontSize(10).fontColor(this.c('metaText', '#999'))
+          Text('Canvas 降级地图').fontSize(10).fontColor(this.c('metaText', '#999'))
             .padding({ left: 8, right: 8, top: 4, bottom: 4 })
             .backgroundColor(this.c('metaBg', '#FFFFFFD9')).borderRadius(8)
         }.position({ x: '50%', y: 12 }).translate({ x: '-50%' })
@@ -157,25 +157,72 @@ export struct MapViewComponent {
     }.width('100%').height(this.getH())
   }
 
+  /**
+   * 精致微型 3D 图钉标点
+   *
+   * 结构（从底到顶）：
+   *   - 图钉尖：3.5px 旋转方块 → 只露下半三角（被上方圆遮住上半）
+   *   - 实心主体：6px statusColor 填充圆 + 1px 白边框
+   *   - 暗部月牙：4px 半透明黑圆偏右下 → 模拟球体阴影（立体感）
+   *   - 高光点：1.5px 白色半透明圆偏左上 → 模拟镜面反射（玻璃质感）
+   *   - 地面投影：.shadow() 下沉 1.5px → 悬浮立体感
+   *   - 选中光晕：14px 半透明白色圆（仅选中可见）
+   *   - 标签：选中时显示在标点上方 12px 处
+   *
+   * 总尺寸约 8×10px（主体 6px + 尖 3px），比原来 11-18px 缩小约 45%
+   */
   @Builder
   Dot(item: MapMarker) {
-    Stack() {
-      Circle({ width: 30, height: 30 }).fill(this.c('markerGlow', '#FFF'))
-        .opacity(item.selected ? 0.22 : 0)
-        .scale({ x: item.selected ? 1.4 : 1, y: item.selected ? 1.4 : 1 })
+    Stack({ alignContent: Alignment.Center }) {
+      // ---- 选中光晕（最底层）----
+      Circle({ width: 14, height: 14 })
+        .fill(this.c('markerGlow', '#FFFFFF'))
+        .opacity(item.selected ? 0.3 : 0)
+        .scale({ x: item.selected ? 1.45 : 1, y: item.selected ? 1.45 : 1 })
         .animation({ duration: 300, curve: Curve.EaseOut })
-      Circle({ width: 14, height: 14 }).fill(item.statusColor)
-        .border({ width: 2, color: this.c('markerBorder', '#FFF') })
-        .scale({ x: item.selected ? 1.2 : 1, y: item.selected ? 1.2 : 1 })
-        .animation({ duration: 200, curve: Curve.EaseOut })
+
+      // ---- 图钉主体（圆 + 三角尖）----
+      Column({ space: -2 }) {
+        // 圆主体：底部阴影 → 实色圆 → 高光
+        Stack({ alignContent: Alignment.Center }) {
+          // 暗部月牙 - 偏右下制造球体立体感
+          Circle({ width: 4.5, height: 4.5 })
+            .fill('#000000')
+            .opacity(0.1)
+            .position({ x: 0.6, y: 0.8 })
+          // 实心主体
+          Circle({ width: 6, height: 6 })
+            .fill(item.statusColor)
+            .border({ width: 1, color: this.c('markerBorder', '#FFFFFF') })
+          // 高光 - 偏左上
+          Circle({ width: 1.5, height: 1.5 })
+            .fill('#FFFFFF')
+            .opacity(0.6)
+            .position({ x: -1, y: -1.2 })
+        }
+        // 图钉三角尖（菱形上半被圆遮住，只露下半 = 三角尖）
+        Rect({ width: 3.5, height: 3.5 })
+          .fill(item.statusColor)
+          .rotate({ angle: 45 })
+      }
+      .scale({ x: item.selected ? 1.2 : 1, y: item.selected ? 1.2 : 1 })
+      .animation({ duration: 200, curve: Curve.EaseOut })
+      // 地面投影 → 立体悬浮
+      .shadow({ radius: 3, color: '#00000025', offsetX: 0, offsetY: 1.5 })
+
+      // ---- 标签（选中时显示在标点上方）----
       if (item.selected) {
-        Text(item.label).fontSize(10).fontColor(this.c('labelText', '#FFF'))
-          .padding({ left: 6, right: 6, top: 2, bottom: 2 })
-          .backgroundColor(this.c('labelBg', '#333')).borderRadius(8)
-          .position({ x: '50%', y: -22 }).translate({ x: '-50%' })
+        Text(item.label)
+          .fontSize(8)
+          .fontColor(this.c('labelText', '#FFFFFF'))
+          .padding({ left: 4, right: 4, top: 1.5, bottom: 1.5 })
+          .backgroundColor(this.c('labelBg', '#333333'))
+          .borderRadius(5)
+          .position({ x: 0, y: -13 })
       }
     }
     .position({ x: this.lngX(item.lng), y: this.latY(item.lat) })
+    .translate({ x: '-50%', y: '-50%' })
     .onClick(() => { this.onMarkerClick(item.id); })
   }
 

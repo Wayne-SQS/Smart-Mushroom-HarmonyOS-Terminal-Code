@@ -235,7 +235,10 @@ export struct MapPage {
     Column() {
       // 简化 Header（只有标题）
       Row() {
-        Text('🗺').fontSize(this.t().fontMd)
+        Stack({ alignContent: Alignment.Center }) {
+          this.MapIcon('map', this.t().textTitle)
+        }
+        .width(20).height(20)
         Text('大棚')
           .fontSize(this.t().fontLg)
           .fontColor(this.t().textTitle)
@@ -345,7 +348,7 @@ export struct MapPage {
     .backgroundColor(this.t().bgPage)
   }
 
-  // ==================== 地图全屏布局（点击 ↗ 触发） ====================
+  // ==================== 地图全屏布局（点击 expand 按钮触发） ====================
   @Builder
   FullscreenMapLayout() {
     Stack() {
@@ -373,18 +376,17 @@ export struct MapPage {
 
       // 顶部浮层（返回按钮 + 控制按钮组）
       Row() {
-        Text('↙')
-          .fontSize(this.t().fontLg)
-          .fontColor(this.t().textWhite)
-          .width(36)
-          .height(36)
-          .textAlign(TextAlign.Center)
-          .backgroundColor(this.t().bgCardLight)
-          .backdropBlur(this.t().blurAmount)
-          .borderRadius(this.t().radiusFull)
-          .onClick(() => {
-            this.isMapFullscreen = false;
-          })
+        Stack({ alignContent: Alignment.Center }) {
+          this.MapIcon('contract', this.t().textWhite)
+        }
+        .width(30)
+        .height(30)
+        .backgroundColor(this.t().bgCardLight)
+        .backdropBlur(this.t().blurAmount)
+        .borderRadius(this.t().radiusFull)
+        .onClick(() => {
+          this.isMapFullscreen = false;
+        })
         Blank()
         this.MapControlButtons()
       }
@@ -395,13 +397,19 @@ export struct MapPage {
 
       // 底部 mini bar（点击恢复分栏）
       Row() {
-        Text('📋').fontSize(this.t().fontLg)
+        Stack({ alignContent: Alignment.Center }) {
+          this.MapIcon('list', this.t().textTitle)
+        }
+        .width(20).height(20)
         Text(`查看大棚列表（${this.greenhouses.length}）`)
           .fontSize(this.t().fontSm)
           .fontColor(this.t().textTitle)
           .margin({ left: 8 })
           .layoutWeight(1)
-        Text('↙').fontSize(this.t().fontLg).fontColor(this.t().textHint)
+        Stack({ alignContent: Alignment.Center }) {
+          this.MapIcon('contract', this.t().textHint)
+        }
+        .width(20).height(20)
       }
       .width('90%')
       .padding({ left: 16, right: 16, top: 12, bottom: 12 })
@@ -425,7 +433,10 @@ export struct MapPage {
   @Builder
   HeaderSection() {
     Row() {
-      Text('🗺').fontSize(this.t().fontLg)
+      Stack({ alignContent: Alignment.Center }) {
+        this.MapIcon('map', this.t().textWhite)
+      }
+      .width(22).height(22)
       Text('地图监控')
         .fontSize(this.t().fontXxl)
         .fontColor(this.t().textWhite)
@@ -443,16 +454,15 @@ export struct MapPage {
         .borderRadius(this.t().radiusFull)
 
       // 搜索图标按钮（点击展开搜索 overlay）
-      Text('🔍')
-        .fontSize(this.t().fontLg)
-        .fontColor(this.t().textWhite)
-        .width(32)
-        .height(32)
-        .textAlign(TextAlign.Center)
-        .margin({ left: 8 })
-        .onClick(() => {
-          this.isSearchVisible = true;
-        })
+      Stack({ alignContent: Alignment.Center }) {
+        this.MapIcon('search', this.t().textWhite)
+      }
+      .width(30)
+      .height(30)
+      .margin({ left: 8 })
+      .onClick(() => {
+        this.isSearchVisible = true;
+      })
     }
     .width('100%')
     .padding({ left: 16, right: 16, top: 12, bottom: 12 })
@@ -468,17 +478,19 @@ export struct MapPage {
   SearchOverlay() {
     Column() {
       Row() {
-        Text('✕')
-          .fontSize(this.t().fontLg)
-          .fontColor(this.t().textWhite)
-          .width(32)
-          .height(32)
-          .textAlign(TextAlign.Center)
-          .onClick(() => {
-            this.isSearchVisible = false;
-            this.searchKeyword = '';
-          })
-        Text('🔍').fontSize(this.t().fontMd).margin({ left: 4 })
+        Stack({ alignContent: Alignment.Center }) {
+          this.MapIcon('close', this.t().textWhite)
+        }
+        .width(30)
+        .height(30)
+        .onClick(() => {
+          this.isSearchVisible = false;
+          this.searchKeyword = '';
+        })
+        Stack({ alignContent: Alignment.Center }) {
+          this.MapIcon('search', this.t().textTitle)
+        }
+        .width(20).height(20).margin({ left: 4 })
         TextInput({ text: this.searchKeyword, placeholder: '搜索大棚名称' })
           .fontSize(this.t().fontMd)
           .fontColor(this.t().textTitle)
@@ -569,24 +581,26 @@ export struct MapPage {
   /**
    * 地图浮层控制按钮组（底部横排，4 个按钮）
    *
-   *   - 🛰 卫星图切换（isSatellite）
-   *   - 🔵 标记聚合 Cluster（enableCluster）
-   *   - 📍 我的位置（enableMyLocation）
-   *   - ↗  全屏切换（isMapFullscreen）
+   *   - satellite   卫星图切换（isSatellite）
+   *   - cluster     标记聚合 Cluster（enableCluster）
+   *   - location    我的位置（enableMyLocation）
+   *   - expand/contract  全屏切换（isMapFullscreen）
+   *
+   * 每个按钮 30×30px，内部图标约 12×12px，使用纯几何图形替代 emoji
    */
   @Builder
   MapControlButtons() {
     Row() {
-      this.MapControlButton('🛰', this.isSatellite, () => {
+      this.MapButtonWithIcon('satellite', this.isSatellite, () => {
         this.isSatellite = !this.isSatellite;
       })
-      this.MapControlButton('🔵', this.enableCluster, () => {
+      this.MapButtonWithIcon('cluster', this.enableCluster, () => {
         this.enableCluster = !this.enableCluster;
       })
-      this.MapControlButton('📍', this.enableMyLocation, () => {
+      this.MapButtonWithIcon('location', this.enableMyLocation, () => {
         this.onLocationToggle();
       })
-      this.MapControlButton(this.isMapFullscreen ? '↙' : '↗', this.isMapFullscreen, () => {
+      this.MapButtonWithIcon(this.isMapFullscreen ? 'contract' : 'expand', this.isMapFullscreen, () => {
         this.isMapFullscreen = !this.isMapFullscreen;
       })
     }
@@ -603,19 +617,137 @@ export struct MapPage {
     })
   }
 
-  /** 单个圆形控制按钮 */
+  /**
+   * 自定义几何图标工厂
+   *
+   * 所有图标控制在 12-14px 尺寸内，全部由 Circle / Rect / Stack / Row / Column 构成，
+   * 不依赖 emoji 或外部图片资源。color 参数由调用方根据激活状态传入。
+   */
   @Builder
-  MapControlButton(icon: string, isOn: boolean, action: () => void) {
-    Text(icon)
-      .fontSize(this.t().fontLg)
-      .fontColor(isOn ? this.t().textOnPrimary : this.t().textTitle)
-      .width(36)
-      .height(36)
-      .textAlign(TextAlign.Center)
-      .backgroundColor(isOn ? this.t().primary : this.t().bgCard)
-      .borderRadius(this.t().radiusFull)
-      .margin({ top: 4, bottom: 4 })
-      .onClick(() => { action(); })
+  MapIcon(type: string, color: string) {
+    if (type === 'satellite') {
+      // 卫星：同心圆（外环扫描 + 内实心）
+      Stack({ alignContent: Alignment.Center }) {
+        Circle({ width: 13, height: 13 }).fill(Color.Transparent).border({ width: 1.2, color: color })
+        Circle({ width: 3.5, height: 3.5 }).fill(color)
+      }
+    } else if (type === 'cluster') {
+      // 聚合：2×2 方块网格（带微小圆角）
+      Column({ space: 1.5 }) {
+        Row({ space: 1.5 }) {
+          Rect({ width: 3.5, height: 3.5 }).fill(color).borderRadius(1)
+          Rect({ width: 3.5, height: 3.5 }).fill(color).borderRadius(1)
+        }
+        Row({ space: 1.5 }) {
+          Rect({ width: 3.5, height: 3.5 }).fill(color).borderRadius(1)
+          Rect({ width: 3.5, height: 3.5 }).fill(color).borderRadius(1)
+        }
+      }
+    } else if (type === 'location') {
+      // 定位：十字准星（圆环 + 十字线）
+      Stack({ alignContent: Alignment.Center }) {
+        Circle({ width: 13, height: 13 }).fill(Color.Transparent).border({ width: 1.2, color: color })
+        Row().width(15).height(1.2).backgroundColor(color)
+        Column().width(1.2).height(15).backgroundColor(color)
+      }
+    } else if (type === 'expand') {
+      // 全屏展开：两条对角 L 形角标（左上 + 右下）
+      Stack({ alignContent: Alignment.Center }) {
+        // 左上角
+        Row() {
+          Column().width(1.5).height(7).backgroundColor(color)
+          Column().width(7).height(1.5).backgroundColor(color)
+        }.position({ x: -3.5, y: -3.5 })
+        // 右下角
+        Row() {
+          Column().width(7).height(1.5).backgroundColor(color)
+          Column().width(1.5).height(7).backgroundColor(color)
+        }.position({ x: 3.5, y: 3.5 })
+      }
+    } else if (type === 'contract') {
+      // 全屏退出：两条对角 L 形角标（右上 + 左下）
+      Stack({ alignContent: Alignment.Center }) {
+        // 右上角
+        Row() {
+          Column().width(7).height(1.5).backgroundColor(color)
+          Column().width(1.5).height(7).backgroundColor(color)
+        }.position({ x: 3.5, y: -3.5 })
+        // 左下角
+        Row() {
+          Column().width(1.5).height(7).backgroundColor(color)
+          Column().width(7).height(1.5).backgroundColor(color)
+        }.position({ x: -3.5, y: 3.5 })
+      }
+    } else if (type === 'search') {
+      // 搜索：放大镜（圆环 + 短手柄）
+      Stack({ alignContent: Alignment.Center }) {
+        Circle({ width: 10, height: 10 }).fill(Color.Transparent).border({ width: 1.2, color: color })
+        Rect({ width: 4.5, height: 1.2 }).fill(color).rotate({ angle: 45 }).position({ x: 5, y: 5 })
+      }
+    } else if (type === 'close') {
+      // 关闭：细 X 形（两条旋转短线）
+      Stack({ alignContent: Alignment.Center }) {
+        Rect({ width: 11, height: 1.3 }).fill(color).rotate({ angle: 45 })
+        Rect({ width: 11, height: 1.3 }).fill(color).rotate({ angle: -45 })
+      }
+    } else if (type === 'alert') {
+      // 告警：圆环 + 叹号（竖线 + 圆点）
+      Column({ space: 1 }) {
+        Rect({ width: 1.5, height: 3.5 }).fill(color)
+        Circle({ width: 2, height: 2 }).fill(color)
+      }
+    } else if (type === 'map') {
+      // 地图图钉：实心圆 + 细尾
+      Column({ space: -0.5 }) {
+        Circle({ width: 8, height: 8 }).fill(color)
+        // 小三角尖（用极窄 Rect 旋转模拟）
+        Rect({ width: 4, height: 4 }).fill(color).rotate({ angle: 45 }).margin({ top: -2.5 })
+      }
+    } else if (type === 'list') {
+      // 列表：三条横线
+      Column({ space: 2 }) {
+        Rect({ width: 13, height: 1.5 }).fill(color).borderRadius(0.75)
+        Rect({ width: 13, height: 1.5 }).fill(color).borderRadius(0.75)
+        Rect({ width: 10, height: 1.5 }).fill(color).borderRadius(0.75)
+      }
+    } else if (type === 'thermo') {
+      // 温度计：细柱 + 底部圆环
+      Column({ space: -1 }) {
+        Rect({ width: 2.5, height: 9 }).fill(color).borderRadius(1.25)
+        Circle({ width: 6, height: 6 }).fill(Color.Transparent).border({ width: 1.2, color: color })
+      }
+    } else if (type === 'humidity') {
+      // 湿度：水滴形（小实心圆 + 尖顶）
+      Column({ space: -1.5 }) {
+        Rect({ width: 4, height: 4 }).fill(color).rotate({ angle: 45 }).margin({ bottom: -2 })
+        Circle({ width: 7, height: 7 }).fill(color)
+      }
+    } else if (type === 'pin') {
+      // 小型定位点（8px 实心圆）
+      Circle({ width: 8, height: 8 }).fill(color)
+    }
+  }
+
+  /**
+   * 图标容器 — 在控制按钮中居中放置 MapIcon
+   * 实际使用时图标跟随按钮一起被点击（pointerEvents 穿透）。
+   */
+  @Builder
+  MapButtonWithIcon(iconType: string, isOn: boolean, action: () => void) {
+    Stack({ alignContent: Alignment.Center }) {
+      // 按钮底
+      Column()
+        .width(30)
+        .height(30)
+        .backgroundColor(isOn ? this.t().primary : this.t().bgCard)
+        .borderRadius(this.t().radiusFull)
+      // 图标（居中）
+      this.MapIcon(iconType, isOn ? this.t().textOnPrimary : this.t().textTitle)
+    }
+    .width(30)
+    .height(30)
+    .margin({ top: 3, bottom: 3 })
+    .onClick(() => { action(); })
   }
 
   /** 定位按钮点击处理（首次开启时提示用户授权） */
@@ -652,18 +784,17 @@ export struct MapPage {
           }, (opt: StatusFilterOption) => opt.value)
           Blank()
           // 告警排序 icon Toggle
-          Text('⚠')
-            .fontSize(this.t().fontSm)
-            .fontColor(this.alertSortEnabled ? this.t().warning : this.t().textSub)
-            .width(28)
-            .height(28)
-            .textAlign(TextAlign.Center)
-            .backgroundColor(this.alertSortEnabled ? this.t().bgCardLight : Color.Transparent)
-            .borderRadius(this.t().radiusFull)
-            .margin({ left: 8 })
-            .onClick(() => {
-              this.alertSortEnabled = !this.alertSortEnabled;
-            })
+          Stack({ alignContent: Alignment.Center }) {
+            this.MapIcon('alert', this.alertSortEnabled ? this.t().warning : this.t().textSub)
+          }
+          .width(28)
+          .height(28)
+          .backgroundColor(this.alertSortEnabled ? this.t().bgCardLight : Color.Transparent)
+          .borderRadius(this.t().radiusFull)
+          .margin({ left: 8 })
+          .onClick(() => {
+            this.alertSortEnabled = !this.alertSortEnabled;
+          })
         }
         .width('100%')
       }
@@ -802,12 +933,14 @@ export struct MapPage {
           .fontWeight(FontWeight.Bold)
           .margin({ left: 8 })
           .layoutWeight(1)
-        Text('✕')
-          .fontSize(this.t().fontLg)
-          .fontColor(this.t().textHint)
-          .onClick(() => {
-            this.closeSheet();
-          })
+        Stack({ alignContent: Alignment.Center }) {
+          this.MapIcon('close', this.t().textHint)
+        }
+        .width(28)
+        .height(28)
+        .onClick(() => {
+          this.closeSheet();
+        })
       }
       .width('100%')
       .padding({ left: 20, right: 20 })
@@ -848,7 +981,13 @@ export struct MapPage {
       // 温湿度
       Row() {
         Column() {
-          Text('🌡 温度').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+          Row({ space: 3 }) {
+            Stack({ alignContent: Alignment.Center }) {
+              this.MapIcon('thermo', this.t().textSub)
+            }
+            .width(12).height(12)
+            Text('温度').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+          }
           Row() {
             Text(item.status === '离线' ? '--' : `${item.temp.toFixed(1)}`)
               .fontSize(this.t().fontLg)
@@ -863,7 +1002,13 @@ export struct MapPage {
         .layoutWeight(1)
 
         Column() {
-          Text('💧 湿度').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+          Row({ space: 3 }) {
+            Stack({ alignContent: Alignment.Center }) {
+              this.MapIcon('humidity', this.t().textSub)
+            }
+            .width(12).height(12)
+            Text('湿度').fontSize(this.t().fontXs).fontColor(this.t().textSub)
+          }
           Row() {
             Text(item.status === '离线' ? '--' : `${item.humidity.toFixed(0)}`)
               .fontSize(this.t().fontLg)
@@ -881,10 +1026,16 @@ export struct MapPage {
       .padding({ top: 12, bottom: 16, left: 20, right: 20 })
 
       // 经纬度
-      Text(`📍 ${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}`)
-        .fontSize(this.t().fontXs)
-        .fontColor(this.t().textHint)
-        .padding({ left: 20, right: 20, bottom: 12 })
+      Row({ space: 4 }) {
+        Stack({ alignContent: Alignment.Center }) {
+          this.MapIcon('pin', this.t().textHint)
+        }
+        .width(10).height(10)
+        Text(`${item.lat.toFixed(4)}, ${item.lng.toFixed(4)}`)
+          .fontSize(this.t().fontXs)
+          .fontColor(this.t().textHint)
+      }
+      .padding({ left: 20, right: 20, bottom: 12 })
 
       // 查看完整详情按钮
       Text('查看完整详情')
