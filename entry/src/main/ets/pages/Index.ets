@@ -7,6 +7,7 @@ import {
   AlertPage,
   GrowthPage,
   RecipePage,
+  VideoMonitorPage,
   ThemeManager,
   ThemeTokens
 } from 'features-core';
@@ -110,47 +111,56 @@ struct Index {
    */
   @Builder
   TabsBottom() {
-    Tabs({ barPosition: BarPosition.End, index: this.currentIndex }) {
-      TabContent() {
-        if (this.currentIndex === 0) {
-          DashboardPage()
+    // 用 Navigation 包裹 Tabs，让窄屏也能响应 navPathStack.pushPath
+    // （否则 MapPage 等 TabContent 内的页面无法跳转到 NavDestination 子页）
+    Navigation(this.navPathStack) {
+      Tabs({ barPosition: BarPosition.End, index: this.currentIndex }) {
+        TabContent() {
+          if (this.currentIndex === 0) {
+            DashboardPage()
+          }
         }
-      }
-      .tabBar(this.TabBuilder(0))
+        .tabBar(this.TabBuilder(0))
 
-      TabContent() {
-        if (this.currentIndex === 1) {
-          DevicePage()
+        TabContent() {
+          if (this.currentIndex === 1) {
+            DevicePage()
+          }
         }
-      }
-      .tabBar(this.TabBuilder(1))
+        .tabBar(this.TabBuilder(1))
 
-      TabContent() {
-        if (this.currentIndex === 2) {
-          MapPage()
+        TabContent() {
+          if (this.currentIndex === 2) {
+            MapPage()
+          }
         }
-      }
-      .tabBar(this.TabBuilder(2))
+        .tabBar(this.TabBuilder(2))
 
-      TabContent() {
-        if (this.currentIndex === 3) {
-          ProfilePage()
+        TabContent() {
+          if (this.currentIndex === 3) {
+            ProfilePage()
+          }
         }
+        .tabBar(this.TabBuilder(3))
       }
-      .tabBar(this.TabBuilder(3))
+      .scrollable(false)
+      .barMode(BarMode.Fixed)
+      .barHeight(56)
+      .onChange((index: number) => {
+        this.currentIndex = index;
+      })
+      .width('100%')
+      .height('100%')
+      // 毛玻璃 TabBar：半透白底 + backdropBlur 模糊下层内容 + 顶边白线
+      .backgroundColor(this.t().bgTabBar)
+      .backdropBlur(this.t().blurAmount)
+      .border({ width: { top: 0.5 }, color: this.t().border })
     }
-    .scrollable(false)
-    .barMode(BarMode.Fixed)
-    .barHeight(56)
-    .onChange((index: number) => {
-      this.currentIndex = index;
-    })
+    .mode(NavigationMode.Stack)
+    .hideTitleBar(true)
+    .navDestination(this.PageDestination)
     .width('100%')
     .height('100%')
-    // 毛玻璃 TabBar：半透白底 + backdropBlur 模糊下层内容 + 顶边白线
-    .backgroundColor(this.t().bgTabBar)
-    .backdropBlur(this.t().blurAmount)
-    .border({ width: { top: 0.5 }, color: this.t().border })
   }
 
   /** 宽屏：仅内容区，导航由 SideNavBar 承担 */
@@ -247,14 +257,32 @@ struct Index {
   @Builder
   PageDestination(name: string) {
     if (name === 'AlertPage') {
-      AlertPage()
+      NavDestination() {
+        AlertPage()
+      }
+      .hideTitleBar(true)
     } else if (name === 'GrowthPage') {
-      GrowthPage()
+      NavDestination() {
+        GrowthPage()
+      }
+      .hideTitleBar(true)
     } else if (name === 'RecipePage') {
-      RecipePage()
+      NavDestination() {
+        RecipePage()
+      }
+      .hideTitleBar(true)
     } else if (name === 'DashboardPage') {
       // 复用 DashboardPage 作为大棚详情占位（MapPage "查看详情"跳转目标）
-      DashboardPage()
+      NavDestination() {
+        DashboardPage()
+      }
+      .hideTitleBar(true)
+    } else if (name === 'VideoMonitorPage') {
+      // 视频监控页（ESP32-CAM TCP 视频流）
+      NavDestination() {
+        VideoMonitorPage()
+      }
+      .hideTitleBar(true)
     }
   }
 

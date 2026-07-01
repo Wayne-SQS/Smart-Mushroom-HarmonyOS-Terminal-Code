@@ -190,6 +190,8 @@ export interface SmartRoomProperties {
   Smoke?: string;
   /** CO₂ 浓度 ppm */
   CO2?: string;
+  /** 蜂鸣器状态：ON / OFF */
+  BuzzerST?: string;
 }
 
 /** smartRoom 服务 - 灯控制命令参数 */

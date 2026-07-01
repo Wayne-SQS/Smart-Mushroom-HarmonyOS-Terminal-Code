@@ -13,8 +13,7 @@ import type { IotAppConfig, IamAuthRequest } from './IotTypes';
 
 const TAG = 'IamAuthUtil';
 
-/** IAM 鉴权服务固定地址前缀（按 region 拼接） */
-const IAM_HOST = 'iam.cn-north-4.myhuaweicloud.com';
+/** IAM 鉴权服务路径 */
 const IAM_PATH = '/v3/auth/tokens';
 
 export class IamAuthUtil {
@@ -49,7 +48,8 @@ export class IamAuthUtil {
       }
     };
 
-    const url = 'https://' + IAM_HOST + IAM_PATH;
+    const iamHost = 'iam.' + config.region + '.myhuaweicloud.com';
+    const url = 'https://' + iamHost + IAM_PATH;
     Logger.info(TAG, '开始申请 IAM Token，URL：' + url);
 
     const httpRequest = http.createHttp();

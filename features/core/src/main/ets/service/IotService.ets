@@ -28,13 +28,17 @@ const TAG = 'IotService';
 /** smartRoom 服务 ID */
 const SERVICE_SMART_ROOM = 'smartRoom';
 
+/** plantAI 服务 ID（ESP32-CAM AI 识别） */
+const SERVICE_PLANT_AI = 'plantAI';
+
 /**
  * IoT 命令下发参数类（每个命令类型对应一个 class，ArkTS 不允许 object literal → Record）
  *
  * 命令名与 paras key 与嵌入式端 mqtt.c handle_cloud_command() 完全对齐：
- * - SetLamp  → LampStatus  (ON/OFF)
- * - SetCond  → CondStatus  (ON/OFF)
- * - SetVent  → VentStatus  (ON/OFF)
+ * - SetLamp   → LampStatus   (ON/OFF)
+ * - SetCond   → CondStatus   (ON/OFF)
+ * - SetVent   → VentStatus   (ON/OFF)
+ * - SetBuzzer → BuzzerStatus (ON/OFF)
  */
 class SetLampParas {
   LampStatus: string;
@@ -47,6 +51,16 @@ class SetCondParas {
 class SetVentParas {
   VentStatus: string;
   constructor(on: boolean) { this.VentStatus = on ? 'ON' : 'OFF'; }
+}
+class SetBuzzerParas {
+  BuzzerStatus: string;
+  constructor(on: boolean) { this.BuzzerStatus = on ? 'ON' : 'OFF'; }
+}
+
+/**
+ * plantAI 服务 recognizeOnce 命令参数（空 paras，仅触发识别）
+ */
+class RecognizeOnceParas {
 }
 
 /** sendCommand 请求体 */
@@ -206,7 +220,8 @@ export class IotService {
       VentST: props['VentST'] as string | undefined,
       Dist: props['Dist'] as string | undefined,
       Smoke: props['Smoke'] as string | undefined,
-      CO2: props['CO2'] as string | undefined
+      CO2: props['CO2'] as string | undefined,
+      BuzzerST: props['BuzzerST'] as string | undefined
     };
     return result;
   }
@@ -214,7 +229,7 @@ export class IotService {
   /**
    * 下发命令（通用）
    *
-   * POST /v5/iot/{projectId}/devices/{deviceId}/commands
+   * POST /v5/iot/{projectId}/devices/{deviceId}/async-commands
    */
   async sendCommand(
     serviceId: string,
@@ -225,10 +240,19 @@ export class IotService {
 
     const url = this.buildCommandUrl();
     const token = this.tokenManager.getToken() ?? '';
+    const tokenReady: boolean = token.length > 0;
 
     const body = new CommandBody(serviceId, commandName, paras);
 
-    Logger.info(TAG, '下发命令：' + commandName + '，服务：' + serviceId);
+    Logger.info(TAG, '[CMD] 准备下发 → service=' + serviceId
+      + ' | command=' + commandName
+      + ' | paras=' + JSON.stringify(paras)
+      + ' | url=' + url
+      + ' | tokenReady=' + tokenReady.toString());
+
+    if (!tokenReady) {
+      Logger.warn(TAG, '[CMD] Token 为空，请求大概率会被云平台拒绝');
+    }
 
     try {
       const httpRequest = http.createHttp();
@@ -242,7 +266,9 @@ export class IotService {
       });
       httpRequest.destroy();
 
-      Logger.info(TAG, '命令下发结果：HTTP ' + response.responseCode);
+      const respBody: string = response.result ? response.result.toString() : '(空)';
+      Logger.info(TAG, '[CMD] 响应 → HTTP=' + response.responseCode
+        + ' | body=' + respBody);
 
       const result: AppSideCommandResponse = {
         command_id: '' + Date.now(),
@@ -251,7 +277,7 @@ export class IotService {
       };
       return result;
     } catch (err) {
-      Logger.error(TAG, '命令下发异常');
+      Logger.error(TAG, '[CMD] 下发异常: ' + String(err));
       throw new Error('命令下发异常: ' + String(err));
     }
   }
@@ -262,6 +288,7 @@ export class IotService {
    * 对应嵌入式 mqtt.c 中 SetLamp 命令，paras={LampStatus: 'ON'/'OFF'}。
    */
   async controlLight(on: boolean): Promise<AppSideCommandResponse> {
+    Logger.info(TAG, '[Lamp] 用户请求 → ' + (on ? 'ON' : 'OFF'));
     const paras = new SetLampParas(on);
     return await this.sendCommand(SERVICE_SMART_ROOM, 'SetLamp', paras);
   }
@@ -284,6 +311,29 @@ export class IotService {
   async controlCondi(on: boolean): Promise<AppSideCommandResponse> {
     const paras = new SetCondParas(on);
     return await this.sendCommand(SERVICE_SMART_ROOM, 'SetCond', paras);
+  }
+
+  /**
+   * 控制蜂鸣器/警报
+   *
+   * 对应嵌入式 mqtt.c 中 SetBuzzer 命令，paras={BuzzerStatus: 'ON'/'OFF'}。
+   */
+  async controlBuzzer(on: boolean): Promise<AppSideCommandResponse> {
+    Logger.info(TAG, '[Buzzer] 用户请求 → ' + (on ? 'ON' : 'OFF'));
+    const paras = new SetBuzzerParas(on);
+    return await this.sendCommand(SERVICE_SMART_ROOM, 'SetBuzzer', paras);
+  }
+
+  /**
+   * 触发植物 AI 识别（ESP32-CAM）
+   *
+   * 对应 plantAI 服务的 recognizeOnce 命令，paras 为空 {}，
+   * 仅触发一次识别，结果通过属性上报返回。
+   */
+  async recognizeOncePlantAI(): Promise<AppSideCommandResponse> {
+    Logger.info(TAG, '[plantAI] 用户请求 → recognizeOnce');
+    const paras = new RecognizeOnceParas();
+    return await this.sendCommand(SERVICE_PLANT_AI, 'recognizeOnce', paras);
   }
 
   /**

@@ -1037,11 +1037,27 @@ export struct MapPage {
       }
       .padding({ left: 20, right: 20, bottom: 12 })
 
-      // 查看完整详情按钮
+      // 查看完整详情按钮（实心底色主按钮）
       Text('查看完整详情')
         .fontSize(this.t().fontSm)
         .fontColor(this.t().textOnPrimary)
         .backgroundColor(this.t().primary)
+        .borderRadius(this.t().radiusSm)
+        .padding({ left: 16, right: 16, top: 10, bottom: 10 })
+        .margin({ left: 20, right: 20, bottom: 8 })
+        .alignSelf(ItemAlign.Stretch)
+        .textAlign(TextAlign.Center)
+        .onClick(() => {
+          this.closeSheet();
+          this.navigateToDashboard(item.id);
+        })
+
+      // 查看监控按钮（描边样式，区别于实心底色主按钮）
+      Text('查看监控')
+        .fontSize(this.t().fontSm)
+        .fontColor(this.t().primary)
+        .backgroundColor(this.t().bgCard)
+        .border({ width: 1, color: this.t().primary })
         .borderRadius(this.t().radiusSm)
         .padding({ left: 16, right: 16, top: 10, bottom: 10 })
         .margin({ left: 20, right: 20, bottom: 20 })
@@ -1049,7 +1065,7 @@ export struct MapPage {
         .textAlign(TextAlign.Center)
         .onClick(() => {
           this.closeSheet();
-          this.navigateToDashboard(item.id);
+          this.navigateToVideoMonitor(item.id);
         })
     }
     .width('100%')
@@ -1146,6 +1162,20 @@ export struct MapPage {
       }
     } catch (err) {
       Logger.warn(TAG, `路由跳转失败: ${JSON.stringify(err)}`);
+    }
+  }
+
+  /** 跳转 VideoMonitorPage（通过 AppStorage 传 greenhouseId，页面内查表决定是否有摄像头） */
+  private navigateToVideoMonitor(greenhouseId: string): void {
+    try {
+      const stack = AppStorage.get<NavPathStack>('navPathStack');
+      if (stack) {
+        // 用 AppStorage 传参，避开 NavPathStack.getParamByName 的 any 类型问题
+        AppStorage.setOrCreate<string>('videoMonitorGreenhouseId', greenhouseId);
+        stack.pushPath({ name: 'VideoMonitorPage' });
+      }
+    } catch (err) {
+      Logger.warn(TAG, `监控页跳转失败: ${JSON.stringify(err)}`);
     }
   }
 

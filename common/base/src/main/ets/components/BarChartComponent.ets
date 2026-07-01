@@ -14,6 +14,8 @@ export struct BarChartComponent {
   @Prop labelColor: string = '#333333';
   @Prop axisColor: string = '#999999';
   @Prop baselineColor: string = '#E0E0E0';
+  @Prop labelFontSize: number = 10;
+  @Prop axisFontSize: number = 10;
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
 
@@ -64,13 +66,13 @@ export struct BarChartComponent {
 
       // 数值标签
       ctx.fillStyle = this.labelColor;
-      ctx.font = '10px sans-serif';
+      ctx.font = this.labelFontSize + 'px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(this.formatValue(point.value), x + barW / 2, y - 4);
 
       // X 轴 label
       ctx.fillStyle = this.axisColor;
-      ctx.font = '10px sans-serif';
+      ctx.font = this.axisFontSize + 'px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(point.label, x + barW / 2, h - padding + 14);
     }

@@ -52,7 +52,8 @@ export class DashboardViewModel extends BaseViewModel {
   controls: ControlItem[] = [
     { id: 'fan', name: '通风', icon: '🌬', active: true, color: '#1890FF' },
     { id: 'condi', name: '空调', icon: '❄', active: false, color: '#2E7D32' },
-    { id: 'light', name: '补光', icon: '💡', active: false, color: '#E6A23C' }
+    { id: 'light', name: '补光', icon: '💡', active: false, color: '#E6A23C' },
+    { id: 'buzzer', name: '蜂鸣器', icon: '🔔', active: false, color: '#F56C6C' }
   ];
 
   /** 概览统计 */
@@ -92,11 +93,12 @@ export class DashboardViewModel extends BaseViewModel {
    * 采用乐观更新策略：先改本地状态，IoT 失败时回滚。
    *
    * 控制项 → 命令映射（与嵌入式 mqtt.c handle_cloud_command 对齐）：
-   * - fan   → smartRoom/SetVent  (paras={VentStatus:'ON'/'OFF'})
-   * - condi → smartRoom/SetCond  (paras={CondStatus:'ON'/'OFF'})
-   * - light → smartRoom/SetLamp  (paras={LampStatus:'ON'/'OFF'})
+   * - fan    → smartRoom/SetVent   (paras={VentStatus:'ON'/'OFF'})
+   * - condi  → smartRoom/SetCond   (paras={CondStatus:'ON'/'OFF'})
+   * - light  → smartRoom/SetLamp   (paras={LampStatus:'ON'/'OFF'})
+   * - buzzer → smartRoom/SetBuzzer (paras={BuzzerStatus:'ON'/'OFF'})
    *
-   * @param controlId 控制项 ID（fan/condi/light）
+   * @param controlId 控制项 ID（fan/condi/light/buzzer）
    * @param on 是否开启
    */
   async refreshControl(controlId: string, on: boolean): Promise<void> {
@@ -110,6 +112,8 @@ export class DashboardViewModel extends BaseViewModel {
         await iot.controlFan(on);
       } else if (controlId === 'condi') {
         await iot.controlCondi(on);
+      } else if (controlId === 'buzzer') {
+        await iot.controlBuzzer(on);
       } else {
         Logger.warn(TAG, '未知控制项：' + controlId);
       }
@@ -124,16 +128,18 @@ export class DashboardViewModel extends BaseViewModel {
   }
 
   /**
-   * 根据 LampST / CondST / VentST 同步 controls 数组中灯/空调/风扇的激活状态
+   * 根据 LampST / CondST / VentST / BuzzerST 同步 controls 数组激活状态
    *
-   * LampST='ON' → light.active=true
-   * CondST='ON' → condi.active=true
-   * VentST='ON' → fan.active=true
+   * LampST='ON'   → light.active=true
+   * CondST='ON'   → condi.active=true
+   * VentST='ON'   → fan.active=true
+   * BuzzerST='ON' → buzzer.active=true
    */
   private syncControlState(props: Record<string, Object>): void {
     const lampSt = props['LampST'] as string | undefined;
     const condSt = props['CondST'] as string | undefined;
     const ventSt = props['VentST'] as string | undefined;
+    const buzzerSt = props['BuzzerST'] as string | undefined;
     if (lampSt !== undefined) {
       this.setControlActive('light', lampSt === 'ON' || lampSt === '1');
     }
@@ -142,6 +148,9 @@ export class DashboardViewModel extends BaseViewModel {
     }
     if (ventSt !== undefined) {
       this.setControlActive('fan', ventSt === 'ON' || ventSt === '1');
+    }
+    if (buzzerSt !== undefined) {
+      this.setControlActive('buzzer', buzzerSt === 'ON' || buzzerSt === '1');
     }
   }
 

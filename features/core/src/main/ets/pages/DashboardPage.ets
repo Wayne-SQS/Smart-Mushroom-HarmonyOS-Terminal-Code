@@ -39,6 +39,8 @@ export struct DashboardPage {
 
   // 24h 趋势数据（mock 演示，可后续接入历史接口）
   @State trendData: ChartPoint[] = [];
+  // 趋势图是否放大悬浮
+  @State trendExpanded: boolean = false;
 
   // 脉冲动画状态
   @State pulseScale: number = 1;
@@ -302,6 +304,11 @@ export struct DashboardPage {
     .layoutWeight(1)
     .scrollBar(BarState.Auto)
     .backgroundColor(this.t().bgPage)
+
+    // 趋势图悬浮放大浮层
+    if (this.trendExpanded) {
+      this.TrendExpandedOverlay()
+    }
   }
 
   private getPagePadding(): number {
@@ -607,9 +614,9 @@ export struct DashboardPage {
           .fontColor(this.t().textTitle)
           .fontWeight(FontWeight.Bold)
         Blank()
-        Text('温度 °C')
-          .fontSize(this.t().fontSm)
-          .fontColor(this.t().textSub)
+        Text('点击放大 ↖')
+          .fontSize(this.t().fontXs)
+          .fontColor(this.t().textHint)
       }
       .width('100%')
       .margin({ bottom: 10 })
@@ -647,6 +654,72 @@ export struct DashboardPage {
     .opacity(this.getEntranceOpacity(6))
     .translate({ y: this.getEntranceTranslateY(6) })
     .animation({ duration: this.t().animationDuration, curve: Curve.EaseOut })
+    .onClick(() => {
+      this.trendExpanded = true;
+    })
+  }
+
+  // ==================== 趋势图悬浮放大浮层 ====================
+  @Builder
+  TrendExpandedOverlay() {
+    Stack() {
+      // 半透明遮罩
+      Column()
+        .width('100%')
+        .height('100%')
+        .backgroundColor('#80000000')
+        .onClick(() => {
+          this.trendExpanded = false;
+        })
+
+      // 放大卡片
+      Column() {
+        Row() {
+          Text('24小时温度趋势')
+            .fontSize(this.t().fontXl)
+            .fontColor(this.t().textTitle)
+            .fontWeight(FontWeight.Bold)
+          Blank()
+          Text('✕')
+            .fontSize(18)
+            .fontColor(this.t().textSub)
+            .width(28)
+            .height(28)
+            .textAlign(TextAlign.Center)
+          .onClick(() => {
+            this.trendExpanded = false;
+          })
+        }
+        .width('100%')
+        .margin({ bottom: 16 })
+
+        if (this.trendData.length > 0) {
+          BarChartComponent({
+            data: this.trendData,
+            barColor: this.t().animationEnabled ? this.t().primaryLight : this.t().primary,
+            labelColor: this.t().textTitle,
+            axisColor: this.t().textSub,
+            baselineColor: this.t().divider,
+            chartHeight: 320,
+            labelFontSize: 14,
+            axisFontSize: 12
+          })
+        }
+      }
+      .width('92%')
+      .padding(20)
+      .backgroundColor(this.t().bgCard)
+      .borderRadius(this.t().radiusLg)
+      .shadow({
+        radius: this.t().shadowCardRadius * 2,
+        color: this.t().shadowCardColor,
+        offsetX: 0,
+        offsetY: 4
+      })
+    }
+    .width('100%')
+    .height('100%')
+    .position({ x: 0, y: 0 })
   }
 
   // ==================== 快捷控制（脉冲动画） ====================
@@ -805,4 +878,5 @@ export struct DashboardPage {
     .translate({ y: this.getEntranceTranslateY(8) })
     .animation({ duration: this.t().animationDuration, curve: Curve.EaseOut })
   }
+
 }

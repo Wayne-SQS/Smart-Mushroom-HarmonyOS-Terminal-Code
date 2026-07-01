@@ -148,7 +148,19 @@ The wide mode uses `Navigation` for the content area, supporting `NavPathStack` 
 | `IotTypes.ets` | All IoT API TypeScript interfaces |
 | `IotExample.ets` | Usage examples (not wired to UI) |
 
+**Available control methods** (all on `IotService` singleton, send async commands via `sendCommand()`):
+- `controlLight(on: boolean)` → `SetLamp`
+- `controlFan(on: boolean)` → `SetVent`
+- `controlCondi(on: boolean)` → `SetCond`
+- `controlBuzzer(on: boolean)` → `SetBuzzer`
+
+**plantAI service** (`SERVICE_PLANT_AI = 'plantAI'`) — ESP32-CAM AI recognition. `recognizeOnce` command with empty paras triggers one-shot plant disease/growth analysis. Result returned via property report. Code has the service constant and paras class defined; UI integration pending.
+
 **Auth flow:** `IotService.init(config) → authenticate() → IamAuthUtil.requestToken() → X-Subject-Token cached in IotTokenManager → queryDeviceShadow/sendCommand`
+
+**IAM endpoint** is dynamically constructed from `config.region`: `iam.{region}.myhuaweicloud.com`. Previously hardcoded to `cn-north-4`.
+
+**Command delivery:** MQTT devices use synchronous `/commands` only. `/async-commands` returns `IOTDA.014114` for MQTT devices. Commands may timeout (`IOTDA.014111`) if the ESP32 is slow to respond — this is a device-side issue.
 
 ### ViewModel Pattern
 
@@ -218,6 +230,8 @@ Breakpoint values are defined in `BreakpointConstants` (common/base). `AdaptiveU
 - `@ohos.data.preferences` — local persistence (login state, config cache)
 - `@ohos.promptAction` — Toast messages (prefer over deprecated `prompt`)
 - `@ohos.net.connection` — network state detection
+- `@ohos.net.socket` — TCP socket (ESP32-CAM video streaming, `constructTCPSocketInstance()`)
+- `@ohos.multimedia.image` — `createImageSource()` + `createPixelMap()` for JPEG frame decoding
 
 ## Git Conventions (from project docs)
 ```
@@ -267,6 +281,7 @@ Properties are defined in the IoTDA console 物模型 (Thing Model). The smartRo
 | `LampST` | Lamp state | controls (light) | ✅ LED | `"ON"` |
 | `CondST` | AC state | controls (condi) | ✅ | `"ON"` |
 | `VentST` | Fan state | controls (fan) | ✅ | `"ON"` |
+| `BuzzerST` | Buzzer state | controls (buzzer) | ✅ ESP32 | `"ON"` |
 
 > **HW?** column: ✅ = hardware reports (see `mqtt.c` JSON_Tree_Format). ❌ = cloud-defined but hardware doesn't report yet — app gracefully falls back to mock data.
 
@@ -279,6 +294,15 @@ SOIL_TEMP and PH have no cloud property defined — remain mock-only.
 | Light (补光) | `SetLamp` | `LampStatus` | `"ON"` / `"OFF"` |
 | Fan (通风) | `SetVent` | `VentStatus` | `"ON"` / `"OFF"` |
 | AC (空调) | `SetCond` | `CondStatus` | `"ON"` / `"OFF"` |
+| Buzzer (蜂鸣器) | `SetBuzzer` | `BuzzerStatus` | `"ON"` / `"OFF"` |
+
+**plantAI 服务（新增，ESP32-CAM AI 识别）：**
+
+| Command | Paras | Purpose |
+|---------|-------|---------|
+| `recognizeOnce` | `{}` | 触发一次植物 AI 识别（病害/长势），结果通过属性上报返回 |
+
+`plantAI` 是独立于 `smartRoom` 的第二个 IoTDA 服务，对应 ESP32-CAM 的 AI 推理能力。截至当前，代码中尚未对接此服务的响应，仅硬件侧上报。
 
 **Hardware response format:** `{"result_code": 0, "response_name": "<CommandName>", "paras": {"Result": "success"|"fail"}}`
 
@@ -298,11 +322,18 @@ The common-base layer provides a reusable chart component hierarchy:
 | Component | Purpose |
 |-----------|---------|
 | `ChartComponent` | Base class — exports `ChartPoint`, `ChartSeries`, `GaugeConfig` interfaces + `ChartUtils` |
-| `BarChartComponent` | Bar/column charts (used for 24h sensor trends) |
+| `BarChartComponent` | Bar/column charts (24h trends). Props include `labelFontSize`/`axisFontSize` (default 10). DashboardPage uses 160px compact card + **tap to expand** overlay (320px chart, 14px/12px fonts). |
 | `LineChartComponent` | Line charts (used for 7-day trends) |
 | `GaugeComponent` | Circular gauge (used for sensor value-at-a-glance) |
+| `MapViewComponent` | Dual-mode map: real MapKit (`@kit.MapKit`) + Canvas fallback, cluster support, 3D pushpin markers |
 
 All chart components take data via typed interfaces (no `any`), support theme-aware colors, and are Canvas-based for performance.
+
+**MapViewComponent props** (in `common/base`): `markers: MapMarker[]`, `centerLat`/`centerLng`, `mapHeight`, `colors: MapViewColors`, `isSatellite`, `enableCluster`, `enableMyLocation`, `onMarkerClick`. Auto-detects MapKit availability via `canIUse('SystemCapability.Map.Core')`.
+
+### Map Icons (`MapIcon` in MapPage.ets)
+
+A set of 14 custom geometric icons (pure `Circle`/`Rect`/`Stack`/`Row`/`Column`) replacing all emoji throughout the map UI. Types: `satellite`, `cluster`, `location`, `expand`, `contract`, `search`, `close`, `alert`, `map`, `list`, `thermo`, `humidity`, `pin`. Each ~12×12px inside 30×30px buttons. See `MapButtonWithIcon` and `MapIcon` @Builders in MapPage.ets.
 
 ### Build Profile Strict Mode
 
@@ -320,6 +351,6 @@ These catch case-sensitivity bugs early — HarmonyOS is case-sensitive but Wind
 | File | Content |
 |------|---------|
 | `harmony-kb.md` | **Primary reference** — HarmonyOS kit APIs, Huawei Cloud IoT integration, coding patterns, official doc links |
-| `后续开发计划.md` | Development roadmap — Phase I (UI ✅ done), Phase II (IoT data ✅ done), Phase III (navigation/charts ✅ done), Phases IV–VI (Map Kit, theming, multi-device, testing — in progress/planned) |
-| `美化.md` | UI theming plan — dual-theme system (frosted glass `theme_frosted` + high contrast `theme_contrast`) with `ThemeManager` singleton, backdropBlur, animation system. **Theme system is planned but not yet implemented** — current code uses `StyleConstants` directly. |
+| `后续开发计划.md` | Development roadmap — Phase I (UI ✅), Phase II (IoT ✅), Phase III (navigation/charts ✅), Phases IV–VI (Map Kit ✅, theming ✅, multi-device partial, testing pending). **AlertPage, RecipePage, theme system 已超前完成。** 视频监控 (ESP32-CAM) 集成计划见 `.claude/plans/`。 |
+| `美化.md` | UI theming plan — the dual-theme system is **now fully implemented**: `ThemeManager` singleton, `ThemeTokens` interface (106 props), `ThemeFrosted` (pastel green, backdropBlur=16, large radii) + `ThemeContrast` (black/white, no blur, minimal radii). All pages access tokens via `this.t()`. |
 
