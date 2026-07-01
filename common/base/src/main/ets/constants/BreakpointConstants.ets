@@ -114,17 +114,38 @@ export class AdaptiveUtils {
   }
 
   /**
-   * XL 屏内容最大宽度（vp）
+   * 大屏内容最大宽度（vp）
    *
-   * 超大屏（PC/大平板）下，主内容区不应无限拉伸，
-   * 用此值限宽居中，避免单行过长影响阅读。
+   * MD 及以上断点下，主内容区不应无限拉伸。
+   * 宽屏左侧有侧栏（getSideBarWidth），内容区 = 屏幕 − 侧栏，
+   * 此处返回值已扣除侧栏占用，让内容在内容区内居中留白。
+   * - MD：720 − 220 = 500vp
+   * - LG：1100 − 220 = 880vp
+   * - XL：1280 − 220 = 1060vp
+   * - XS/SM：不限宽（无侧栏，全宽填充）
    */
   static getMaxContentWidth(breakpoint: string): number {
+    let base: number;
     switch (breakpoint) {
-      case BreakpointConstants.XL: return 1280;
-      case BreakpointConstants.LG: return 1100;
-      default: return 0; // 不限宽
+      case BreakpointConstants.XL: base = 1280; break;
+      case BreakpointConstants.LG: base = 1100; break;
+      case BreakpointConstants.MD: base = 720; break;
+      default: return 0; // XS/SM 不限宽
     }
+    // 宽屏左侧有侧栏（getSideBarWidth vp），内容区限宽需扣除侧栏占用，
+    // 让内容在「屏幕−侧栏」的内容区内居中留白，而非全宽拉伸。
+    return base - AdaptiveUtils.getSideBarWidth();
+  }
+
+  /**
+   * 宽屏侧边导航栏宽度（vp）
+   *
+   * 多端部署规范：平板/2in1/PC 侧栏采用标准 220vp，
+   * 容纳「矢量图标 + 文字」横排，比例协调。
+   * 窄屏（XS/SM）不使用侧栏，走底部 Tabs。
+   */
+  static getSideBarWidth(): number {
+    return 220;
   }
 
   /**

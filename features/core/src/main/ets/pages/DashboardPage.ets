@@ -628,7 +628,9 @@ export struct DashboardPage {
           labelColor: this.t().textTitle,
           axisColor: this.t().textSub,
           baselineColor: this.t().divider,
-          chartHeight: 160
+          chartHeight: 200,
+          labelFontSize: 22,
+          axisFontSize: 16
         })
       } else {
         Column()
@@ -700,9 +702,9 @@ export struct DashboardPage {
             labelColor: this.t().textTitle,
             axisColor: this.t().textSub,
             baselineColor: this.t().divider,
-            chartHeight: 320,
-            labelFontSize: 14,
-            axisFontSize: 12
+            chartHeight: 340,
+            labelFontSize: 30,
+            axisFontSize: 22
           })
         }
       }

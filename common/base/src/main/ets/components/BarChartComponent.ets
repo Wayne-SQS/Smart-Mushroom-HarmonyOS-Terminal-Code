@@ -14,8 +14,8 @@ export struct BarChartComponent {
   @Prop labelColor: string = '#333333';
   @Prop axisColor: string = '#999999';
   @Prop baselineColor: string = '#E0E0E0';
-  @Prop labelFontSize: number = 10;
-  @Prop axisFontSize: number = 10;
+  @Prop labelFontSize: number = 16;
+  @Prop axisFontSize: number = 14;
   private settings: RenderingContextSettings = new RenderingContextSettings(true);
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings);
 
