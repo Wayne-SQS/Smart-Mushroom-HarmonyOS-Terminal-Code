@@ -17,3 +17,23 @@
 
 # AGC 配置（含 API Key，由 AppGallery Connect 生成，严禁提交）
 **/agconnect-services.json
+
+# 签名与证书文件 (Signature and Certificate files)
+*.p12
+*.p7b
+*.cer
+*.jks
+*.pem
+*.key
+*.csr
+*.pfx
+
+# 补充的编译临时产物和依赖缓存 (Additional build temp and dependencies cache)
+.preview/
+.deveco/
+oh_modules/
+node_modules/
+
+# 操作系统生成的缓存文件 (OS generated files)
+.DS_Store
+Thumbs.db
