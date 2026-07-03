@@ -64,9 +64,10 @@
 - 支持用户自定义配方
 
 ### 🎨 双主题系统
-- **毛玻璃主题**（Frosted）：柔和绿色质感，`backdropBlur` 模糊面板
-- **高对比主题**（Contrast）：黑白极简，无障碍友好
-- 全局 106 项主题 Token，一键切换
+- **毛玻璃主题**（Frosted）：菌菇棕点缀雾透质感，`backdropBlur` 模糊面板
+- **高对比主题**（Contrast）：深菌菇棕黑白极简，无障碍友好
+- 全局 80+ 项主题 Token（品牌色/字重体系/等宽字体/卡片高光/按压态禁用态阴影），一键切换
+- 配色与应用图标（#B07A3E 菌菇棕）统一，6 位 hex 全平台兼容
 
 ### 📱 响应式多端适配
 - 支持 **6 种设备形态**：手机、平板、2in1、手表、车机、智慧屏
@@ -107,13 +108,13 @@ entry → features/core → common/base
 | 语言 | ArkTS (TypeScript 超集) |
 | UI 框架 | ArkUI (声明式) |
 | 应用模型 | Stage Model |
-| 状态管理 | V1（@State/@Prop/@Link/@Provide/@Consume） + V2（@ObservedV2/@Trace/@Local/@Param） |
+| 状态管理 | V1（@State/@Prop/@Link/@Watch/@StorageLink） |
 | HTTP 通信 | `@kit.NetworkKit` (http) |
 | 加密认证 | `@kit.CryptoArchitectureKit` (HMAC-SHA256) |
 | 地图 | `@kit.MapKit` + Canvas 自绘回退 |
-| 视频流 | `@ohos.net.socket` (TCP Socket) + `@ohos.multimedia.image` |
+| 视频流 | `@ohos.net.socket` (TCP Socket) + `@kit.ImageKit` |
 | 云服务 | 华为云 IoTDA（设备影子 + 命令下发）+ IAM（鉴权） |
-| 持久化 | `@ohos.data.preferences` |
+| 持久化 | `PersistentStorage` (主题) + `@ohos.data.preferences` (登录) |
 | 构建 | Hvigor |
 | 测试 | `@ohos/hypium` + `@ohos/hamock` |
 | API 版本 | 6.1.1(24) |
@@ -134,7 +135,7 @@ SoftwareAction/
 │
 ├── features/core/                      # 业务核心 (HAR)
 │   └── src/main/ets/
-│       ├── pages/                      # 8 个业务页面
+│       ├── pages/                      # 9 个业务页面
 │       │   ├── DashboardPage.ets       # 仪表盘首页
 │       │   ├── DevicePage.ets          # 设备管理
 │       │   ├── MapPage.ets             # 大棚地图
@@ -142,9 +143,18 @@ SoftwareAction/
 │       │   ├── AlertPage.ets           # 告警中心
 │       │   ├── RecipePage.ets          # 环境配方
 │       │   ├── ProfilePage.ets         # 个人中心
+│       │   ├── LoginPage.ets           # 登录页
 │       │   └── VideoMonitorPage.ets    # ESP32-CAM 视频
+│       ├── components/                 # 可复用 UI 组件
+│       │   ├── NumberRoller.ets        # 数字滚动（主题驱动）
+│       │   └── SkeletonCard.ets        # 骨架屏加载占位
 │       ├── viewmodel/                  # MVVM ViewModel 层
 │       ├── model/                      # 数据模型
+│       ├── theme/                      # 双主题系统
+│       │   ├── ThemeManager.ets        # 主题单例
+│       │   ├── ThemeTokens.ets         # Token 接口（80+ 属性）
+│       │   ├── ThemeFrosted.ets        # 菌菇棕雾透主题
+│       │   └── ThemeContrast.ets       # 深棕黑白主题
 │       └── service/                    # IoT 服务层（华为云 IoTDA）
 │           ├── IotService.ets          # 单例 · 影子查询 · 命令下发
 │           ├── IamAuthUtil.ets         # IAM Token 鉴权
@@ -170,8 +180,15 @@ SoftwareAction/
 │
 ├── docs/                               # 设计文档 & 知识库
 │   ├── harmony-kb.md                   # HarmonyOS 开发知识库
+│   ├── 鸿蒙技术开发文档.docx            # 完整技术文档（24 张图）
 │   ├── 后续开发计划.md                   # 开发路线图
-│   └── 美化.md                         # 主题设计方案
+│   ├── 美化.md                         # 主题设计方案
+│   └── diagrams/                       # 技术架构图（Mermaid 源 + PNG）
+│
+├── scripts/                            # 资源生成脚本
+│   ├── generate_pixel_assets.py        # 像素风图标生成
+│   ├── generate_theme_icons.py         # 主题图标批量生成
+│   └── generate_noise_texture.py       # Header 噪点纹理生成
 │
 ├── CLAUDE.md                           # AI 辅助开发指南
 ├── build-profile.json5                 # 项目构建配置
@@ -297,9 +314,13 @@ ESP32 硬件
 - [x] 双模式地图（MapKit + Canvas 回退）
 - [x] 告警系统 + 阈值自动计算
 - [x] 环境配方管理
-- [x] 双主题系统（毛玻璃 + 高对比）
+- [x] 双主题系统（菌菇棕雾透 + 深棕黑白，80+ Token）
 - [x] 五档断点响应式布局
-- [x] ESP32-CAM 视频监控（TCP Socket + MJPEG 解码）
+- [x] ESP32-CAM 视频监控（TCP Socket + JPEG 解码）
+- [x] 像素风图标系统（7 组 × 3 尺寸，替代 emoji/几何绘制）
+- [x] NumberRoller 数字滚动 + SkeletonCard 骨架屏组件
+- [x] 登录页（蘑菇插画 + 主题感知渐变）
+- [x] 技术文档完善（24 张技术架构图）
 
 ### 🚧 进行中 / 计划
 
