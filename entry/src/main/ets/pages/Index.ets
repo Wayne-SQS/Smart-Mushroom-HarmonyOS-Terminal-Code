@@ -10,7 +10,8 @@ import {
   VideoMonitorPage,
   DeviceDetailPage,
   ThemeManager,
-  ThemeTokens
+  ThemeTokens,
+  LoginPage
 } from 'features-core';
 import { AppRouter } from './AppRouter';
 
@@ -34,6 +35,8 @@ struct Index {
   @State currentBreakpoint: string = BreakpointConstants.SM;
   /** 监听主题切换，框架自动触发 build() 重绘 */
   @StorageLink('themeName') themeName: string = 'frosted';
+  /** 登录态控制：未登录显示 LoginPage，登录后显示主界面 */
+  @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
 
   /** 一行获取当前主题 token（主题切换后 build() 重跑，自动取到新值） */
   t(): ThemeTokens {
@@ -50,6 +53,7 @@ struct Index {
   aboutToAppear(): void {
     AppStorage.setOrCreate<NavPathStack>('navPathStack', this.navPathStack);
     AppStorage.setOrCreate<string>('currentBreakpoint', this.currentBreakpoint);
+    AppStorage.setOrCreate<boolean>('isLoggedIn', this.isLoggedIn);
   }
 
   /** 是否使用侧栏导航（宽屏） */
@@ -58,46 +62,55 @@ struct Index {
   }
 
   build() {
-    Row() {
-      // 宽屏：左侧竖向导航栏
-      if (this.isSideBarLayout()) {
-        this.SideNavBar()
-      }
-
-      // 主内容区
-      Column() {
+    if (!this.isLoggedIn) {
+      LoginPage()
+        .width('100%')
+        .height('100%')
+        .onAreaChange((_: Area, newArea: Area) => {
+          this.handleBreakpointChange(newArea);
+        })
+    } else {
+      Row() {
         if (this.isSideBarLayout()) {
-          // 宽屏：内容区 + 顶部不显示 tabBar（已用 SideNavBar 替代）
-          this.TabContentArea()
-        } else {
-          // 窄屏：Tabs 在底部
-          this.TabsBottom()
+          this.SideNavBar()
         }
+        Column() {
+          if (this.isSideBarLayout()) {
+            this.TabContentArea()
+          } else {
+            this.TabsBottom()
+          }
+        }
+        .layoutWeight(1)
+        .height('100%')
       }
-      .layoutWeight(1)
+      .width('100%')
       .height('100%')
+      .onAreaChange((_: Area, newArea: Area) => {
+        this.handleBreakpointChange(newArea);
+      })
     }
-    .width('100%')
-    .height('100%')
-    .onAreaChange((_: Area, newArea: Area) => {
-      const w = newArea.width as number;
-      let bp = BreakpointConstants.SM;
-      if (w >= BreakpointConstants.BREAKPOINT_XL) {
-        bp = BreakpointConstants.XL;
-      } else if (w >= BreakpointConstants.BREAKPOINT_LG) {
-        bp = BreakpointConstants.LG;
-      } else if (w >= BreakpointConstants.BREAKPOINT_MD) {
-        bp = BreakpointConstants.MD;
-      } else if (w >= BreakpointConstants.BREAKPOINT_SM) {
-        bp = BreakpointConstants.SM;
-      } else {
-        bp = BreakpointConstants.XS;
-      }
-      if (bp !== this.currentBreakpoint) {
-        this.currentBreakpoint = bp;
-        AppStorage.setOrCreate<string>('currentBreakpoint', bp);
-      }
-    })
+  }
+
+  /** 统一的断点变化处理（登录页 & 主界面共用） */
+  private handleBreakpointChange(newArea: Area): void {
+    const w = newArea.width as number;
+    let bp = BreakpointConstants.SM;
+    if (w >= BreakpointConstants.BREAKPOINT_XL) {
+      bp = BreakpointConstants.XL;
+    } else if (w >= BreakpointConstants.BREAKPOINT_LG) {
+      bp = BreakpointConstants.LG;
+    } else if (w >= BreakpointConstants.BREAKPOINT_MD) {
+      bp = BreakpointConstants.MD;
+    } else if (w >= BreakpointConstants.BREAKPOINT_SM) {
+      bp = BreakpointConstants.SM;
+    } else {
+      bp = BreakpointConstants.XS;
+    }
+    if (bp !== this.currentBreakpoint) {
+      this.currentBreakpoint = bp;
+      AppStorage.setOrCreate<string>('currentBreakpoint', bp);
+    }
   }
 
   /**

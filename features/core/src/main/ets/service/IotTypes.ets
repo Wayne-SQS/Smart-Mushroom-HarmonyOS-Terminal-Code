@@ -194,6 +194,25 @@ export interface SmartRoomProperties {
   BuzzerST?: string;
 }
 
+/**
+ * plantAI 服务设备影子 reported.properties
+ *
+ * ESP32-CAM AI 识别结果，通过 recognizeOnce 命令触发后由硬件上报。
+ * 属性名以 IoTDA 控制台物模型为准（plantAI 服务）。
+ */
+export interface PlantAIProperties {
+  /** 植株识别结果，如 "单一感染" / "健康" / "菌丝生长期" */
+  plantStatus?: string;
+  /** 模型识别置信度，如 "0.7324" */
+  confidence?: string;
+  /** 本次截图识别时间，如 "2026-07-03 18:37:53" */
+  captureTime?: string;
+  /** 摄像头连接状态："在线" / "离线" */
+  cameraStatus?: string;
+  /** AI 模型运行状态："完成" / "运行中" / "空闲" */
+  aiStatus?: string;
+}
+
 /** smartRoom 服务 - 灯控制命令参数 */
 export interface LightCommandParas {
   /** 'ON' / 'OFF' */

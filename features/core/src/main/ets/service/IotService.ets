@@ -20,6 +20,7 @@ import type {
   DeviceShadowService,
   DeviceShadowResponse,
   SmartRoomProperties,
+  PlantAIProperties,
   AppSideCommandResponse
 } from './IotTypes';
 
@@ -222,6 +223,27 @@ export class IotService {
       Smoke: props['Smoke'] as string | undefined,
       CO2: props['CO2'] as string | undefined,
       BuzzerST: props['BuzzerST'] as string | undefined
+    };
+    return result;
+  }
+
+  /**
+   * 便捷方法：获取 plantAI 服务属性（强类型）
+   *
+   * 内部走 getDeviceProperties('plantAI')，转换为 PlantAIProperties。
+   * plantAI 是独立于 smartRoom 的第二个 IoTDA 服务，对应 ESP32-CAM AI 识别结果。
+   */
+  async getPlantAIProperties(): Promise<PlantAIProperties | null> {
+    const props = await this.getDeviceProperties(SERVICE_PLANT_AI);
+    if (!props) {
+      return null;
+    }
+    const result: PlantAIProperties = {
+      plantStatus: props['plantStatus'] as string | undefined,
+      confidence: props['confidence'] as string | undefined,
+      captureTime: props['captureTime'] as string | undefined,
+      cameraStatus: props['cameraStatus'] as string | undefined,
+      aiStatus: props['aiStatus'] as string | undefined
     };
     return result;
   }

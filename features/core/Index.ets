@@ -23,6 +23,7 @@ export type {
   IamAuthRequest,
   IotAppConfig,
   SmartRoomProperties,
+  PlantAIProperties,
   LightCommandParas,
   SmartRoomCommandRequest,
   AppSideCommandResponse
@@ -37,6 +38,7 @@ export { AlertPage } from './src/main/ets/pages/AlertPage'
 export { RecipePage } from './src/main/ets/pages/RecipePage'
 export { VideoMonitorPage } from './src/main/ets/pages/VideoMonitorPage'
 export { DeviceDetailPage } from './src/main/ets/pages/DeviceDetailPage'
+export { LoginPage } from './src/main/ets/pages/LoginPage'
 export type { SensorDataItem, AlertItem, DeviceItem, GrowthBatch, ControlItem } from './src/main/ets/model/GreenhouseModel'
 export type { Recipe } from './src/main/ets/model/RecipeModel'
 export { DEFAULT_RECIPES, GrowthStage, MushroomType } from './src/main/ets/model/RecipeModel'
