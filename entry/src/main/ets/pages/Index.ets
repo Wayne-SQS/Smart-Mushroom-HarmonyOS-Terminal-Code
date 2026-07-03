@@ -8,6 +8,7 @@ import {
   GrowthPage,
   RecipePage,
   VideoMonitorPage,
+  DeviceDetailPage,
   ThemeManager,
   ThemeTokens
 } from 'features-core';
@@ -343,6 +344,12 @@ struct Index {
       // 视频监控页（ESP32-CAM TCP 视频流）
       NavDestination() {
         VideoMonitorPage()
+      }
+      .hideTitleBar(true)
+    } else if (name === 'DeviceDetailPage') {
+      // 设备详情页（传感器信息 / 控制器开关）
+      NavDestination() {
+        DeviceDetailPage()
       }
       .hideTitleBar(true)
     }

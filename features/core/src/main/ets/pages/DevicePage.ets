@@ -1,10 +1,15 @@
 import { BreakpointConstants, AdaptiveUtils } from 'common-base';
 import { DeviceItem } from '../model/GreenhouseModel';
+import { DeviceViewModel } from '../viewmodel/DeviceViewModel';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeTokens } from '../theme/ThemeTokens';
+import { Logger } from 'common-base';
 
 /**
  * 设备管理页面 - 多端适配（主题驱动）
+ *
+ * 定位：设备清单 + 在线状态 + 设备控制入口
+ * 传感器数据展示在 DashboardPage（首页），本页不重复展示数值。
  */
 
 @Component
@@ -12,23 +17,90 @@ export struct DevicePage {
   @StorageLink('currentBreakpoint') currentBreakpoint: string = BreakpointConstants.SM;
   @StorageLink('themeName') themeName: string = 'frosted';
 
-  @State devices: DeviceItem[] = [
-    { id: '1', name: '温度传感器-A区', type: '温度', status: 1, lastUpdate: '10秒前', location: 'A区东侧' },
-    { id: '2', name: '湿度传感器-A区', type: '湿度', status: 1, lastUpdate: '8秒前', location: 'A区西侧' },
-    { id: '3', name: 'CO2传感器-A区', type: 'CO₂', status: 1, lastUpdate: '15秒前', location: 'A区中央' },
-    { id: '4', name: '光照传感器-B区', type: '光照', status: 1, lastUpdate: '5秒前', location: 'B区顶部' },
-    { id: '5', name: '土壤湿度-3号', type: '土壤湿度', status: 0, lastUpdate: '15分钟前', location: 'C区3号位' },
-    { id: '6', name: '通风控制器', type: '控制器', status: 1, lastUpdate: '运行中', location: '大棚东墙' },
-    { id: '7', name: '喷雾系统', type: '控制器', status: 1, lastUpdate: '待机', location: '大棚顶部' },
-    { id: '8', name: '补光灯组', type: '控制器', status: 0, lastUpdate: '已关闭', location: 'B区顶部' }
-  ];
+  @State devices: DeviceItem[] = [];
+  @State totalCount: number = 0;
+  @State onlineCount: number = 0;
+  @State offlineCount: number = 0;
+  /** 搜索关键词 */
+  @State searchKeyword: string = '';
+  /** 状态筛选：''=全部 'online'=在线 'offline'=离线 'fault'=故障 */
+  @State statusFilter: string = '';
+  /** 是否正在刷新 */
+  @State isRefreshing: boolean = false;
 
-  @State totalCount: number = 8;
-  @State onlineCount: number = 7;
-  @State offlineCount: number = 1;
+  private viewModel: DeviceViewModel = new DeviceViewModel();
 
   t(): ThemeTokens {
     return ThemeManager.getInstance().getTokens();
+  }
+
+  aboutToAppear(): void {
+    this.syncFromViewModel();
+    this.loadDeviceData();
+  }
+
+  /** 从 ViewModel 同步数据到状态 */
+  private syncFromViewModel(): void {
+    this.devices = [...this.viewModel.devices];
+    this.totalCount = this.viewModel.totalCount;
+    this.onlineCount = this.viewModel.onlineCount;
+    this.offlineCount = this.viewModel.offlineCount;
+  }
+
+  /** 加载设备数据（IoT 在线状态同步，失败降级到 mock） */
+  private async loadDeviceData(): Promise<void> {
+    await this.viewModel.loadData();
+    this.syncFromViewModel();
+  }
+
+  /** 下拉刷新 */
+  private async onRefresh(): Promise<void> {
+    this.isRefreshing = true;
+    await this.loadDeviceData();
+    this.isRefreshing = false;
+  }
+
+  /** 搜索 + 筛选后的设备列表 */
+  private getFilteredDevices(): DeviceItem[] {
+    let list = this.devices;
+    // 关键词过滤（名称 / 类型 / 位置）
+    if (this.searchKeyword.trim().length > 0) {
+      const kw = this.searchKeyword.trim().toLowerCase();
+      list = list.filter((d: DeviceItem) =>
+        d.name.toLowerCase().includes(kw) ||
+        d.type.toLowerCase().includes(kw) ||
+        d.location.toLowerCase().includes(kw)
+      );
+    }
+    // 状态筛选
+    if (this.statusFilter === 'online') {
+      list = list.filter((d: DeviceItem) => d.status === 1);
+    } else if (this.statusFilter === 'offline') {
+      list = list.filter((d: DeviceItem) => d.status === 0);
+    } else if (this.statusFilter === 'fault') {
+      list = list.filter((d: DeviceItem) => d.status === 2);
+    }
+    return list;
+  }
+
+  /** 点击设备卡片 → 跳转详情页 */
+  private onDeviceClick(item: DeviceItem): void {
+    try {
+      AppStorage.setOrCreate('deviceDetailParam', {
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        status: item.status,
+        lastUpdate: item.lastUpdate,
+        location: item.location
+      });
+      const stack = AppStorage.get<NavPathStack>('navPathStack');
+      if (stack) {
+        stack.pushPath({ name: 'DeviceDetailPage' });
+      }
+    } catch (err) {
+      Logger.warn('DevicePage', '路由跳转失败');
+    }
   }
 
   build() {
@@ -59,6 +131,7 @@ export struct DevicePage {
   ContentBody() {
     this.HeaderSection()
     this.StatsBar()
+    this.SearchAndFilterBar()
     this.DeviceList()
   }
 
@@ -118,6 +191,9 @@ export struct DevicePage {
             .padding({ left: 14, right: 14, top: 8, bottom: 8 })
             .backgroundColor(this.t().bgCardLight)
             .borderRadius(this.t().radiusSm)
+            .onClick(() => {
+              this.onAddDevice();
+            })
         }
         .width('100%')
         .padding({ left: this.getPagePadding(), right: this.getPagePadding() })
@@ -161,7 +237,6 @@ export struct DevicePage {
         .textAlign(TextAlign.Center)
         .borderRadius(18)
         .backgroundColor(this.t().bgCardLight)
-      // 大字号走 AdaptiveUtils 断点自适应
       Text(value)
         .fontSize(AdaptiveUtils.getOverviewFontSize(this.currentBreakpoint))
         .fontColor(this.t().textTitle)
@@ -176,33 +251,115 @@ export struct DevicePage {
     .alignItems(HorizontalAlign.Center)
   }
 
+  // ==================== 搜索 + 状态筛选 ====================
+  @Builder
+  SearchAndFilterBar() {
+    Column() {
+      // 搜索栏
+      Row() {
+        Search({
+          placeholder: '搜索设备名称、类型、位置...',
+          value: this.searchKeyword
+        })
+          .width('100%')
+          .height(40)
+          .backgroundColor(this.t().bgCardLight)
+          .borderRadius(this.t().radiusSm)
+          .onChange((value: string) => {
+            this.searchKeyword = value;
+          })
+          .onSubmit((value: string) => {
+            this.searchKeyword = value;
+          })
+      }
+      .width('100%')
+
+      // 状态筛选 chips
+      Row() {
+        this.FilterChip('全部', '', this.statusFilter === '')
+        this.FilterChip('在线', 'online', this.statusFilter === 'online')
+        this.FilterChip('离线', 'offline', this.statusFilter === 'offline')
+        this.FilterChip('故障', 'fault', this.statusFilter === 'fault')
+      }
+      .width('100%')
+      .margin({ top: 8 })
+    }
+    .width('100%')
+    .padding({
+      left: this.getPagePadding(),
+      right: this.getPagePadding(),
+      top: 12
+    })
+  }
+
+  @Builder
+  FilterChip(label: string, filterKey: string, isActive: boolean) {
+    Text(label)
+      .fontSize(this.t().fontXs)
+      .fontColor(isActive ? this.t().textWhite : this.t().textSub)
+      .fontWeight(isActive ? FontWeight.Medium : FontWeight.Normal)
+      .padding({ left: 12, right: 12, top: 4, bottom: 4 })
+      .backgroundColor(isActive ? this.t().primary : this.t().bgCardLight)
+      .borderRadius(14)
+      .margin({ right: 8 })
+      .onClick(() => {
+        this.statusFilter = filterKey;
+      })
+  }
+
   // ==================== 设备列表 ====================
   @Builder
   DeviceList() {
-    Scroll() {
-      Column() {
-        GridRow({
-          gutter: { x: this.getCardGap(), y: this.getCardGap() }
-        }) {
-          ForEach(this.devices, (item: DeviceItem) => {
-            GridCol({ span: this.getDeviceSpan() }) {
-              this.DeviceCard(item)
+    Refresh({ refreshing: $$this.isRefreshing }) {
+      Scroll() {
+        Column() {
+          if (this.getFilteredDevices().length === 0) {
+            this.EmptyState()
+          } else {
+            GridRow({
+              gutter: { x: this.getCardGap(), y: this.getCardGap() }
+            }) {
+              ForEach(this.getFilteredDevices(), (item: DeviceItem) => {
+                GridCol({ span: this.getDeviceSpan() }) {
+                  this.DeviceCard(item)
+                }
+              })
             }
-          })
+            .width('100%')
+            .padding({
+              left: this.getPagePadding(),
+              right: this.getPagePadding(),
+              top: 4
+            })
+          }
+          Blank().height(80)
         }
         .width('100%')
-        .padding({
-          left: this.getPagePadding(),
-          right: this.getPagePadding(),
-          top: 12
-        })
-        Blank().height(80)
       }
-      .width('100%')
+      .layoutWeight(1)
+      .scrollBar(BarState.Auto)
     }
+    .onRefreshing(() => {
+      this.onRefresh();
+    })
     .layoutWeight(1)
-    .scrollBar(BarState.Auto)
-    .margin({ top: 8 })
+  }
+
+  /** 空状态占位 */
+  @Builder
+  EmptyState() {
+    Column() {
+      Text('📭')
+        .fontSize(48)
+        .opacity(0.4)
+      Text('没有匹配的设备')
+        .fontSize(this.t().fontMd)
+        .fontColor(this.t().textSub)
+        .margin({ top: 8 })
+    }
+    .width('100%')
+    .padding({ top: 60, bottom: 60 })
+    .alignItems(HorizontalAlign.Center)
   }
 
   @Builder
@@ -276,6 +433,9 @@ export struct DevicePage {
       offsetX: 0,
       offsetY: this.t().shadowCardOffsetY
     })
+    .onClick(() => {
+      this.onDeviceClick(item);
+    })
   }
 
   private getStatusColor(status: number): string {
@@ -300,5 +460,20 @@ export struct DevicePage {
       case '控制器': return '⚙';
       default: return '📊';
     }
+  }
+
+  /** "+ 添加"按钮点击 — 弹出添加设备对话框 */
+  private onAddDevice(): void {
+    // 预留：后续实现添加设备表单（CustomDialog / 底部 Sheet）
+    // 当前仅给出提示
+    AlertDialog.show({
+      title: '添加设备',
+      message: '添加设备功能正在开发中，敬请期待。',
+      confirm: {
+        value: '知道了',
+        fontColor: this.t().primary,
+        action: () => {}
+      }
+    });
   }
 }
