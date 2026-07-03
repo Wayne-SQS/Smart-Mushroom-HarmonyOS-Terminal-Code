@@ -1,0 +1,26 @@
+%%{init: {'theme': 'neutral', 'themeVariables': {'fontSize': '18px'}}}%%
+flowchart TB
+    subgraph MapSection["🗺️ MapViewComponent 双模式决策"]
+        direction TB
+        MapEntry["MapViewComponent.build()"]
+        CanIUse{"canIUse(<br/>'SystemCapability.Map.Core')<br/>?"}
+        MapKit["✅ MapKit 模式<br/>━━━━━━━━━━<br/>MapComponent<br/>setMapType(STANDARD|SATELLITE)<br/>setMyLocationEnabled<br/>addClusterOverlay<br/>addMarker"]
+        CanvasMode["⬇️ Canvas 降级模式<br/>━━━━━━━━━━<br/>linearGradient 三段渐变<br/>网格线<br/>自绘 3D 图钉<br/>(多层 Stack 堆叠)"]
+
+        MapEntry --> CanIUse
+        CanIUse -->|"true"| MapKit
+        CanIUse -->|"false"| CanvasMode
+    end
+
+    subgraph MVVMSection["🏗️ MVVM 数据流"]
+        direction TB
+        Cloud["☁️ IoTDA 云端数据"]
+        VM["ViewModel (纯 TS 类)<br/>━━━━━━━━━━<br/>loadData()<br/>→ handleAsync() 包装<br/>→ sensors[] / controls[]"]
+        State["Page @State<br/>━━━━━━━━━━<br/>aboutToAppear() {<br/>  this.sensors = [...vm.sensors]<br/>  this.loadFromViewModel()<br/>}"]
+        UI["build() 渲染 UI<br/>━━━━━━━━━━<br/>GridRow + GridCol<br/>SensorCard / ControlCard"]
+
+        Cloud -->|"IotService 拉取"| VM
+        VM -->|"[...vm.data] 浅拷贝"| State
+        State -->|"数据绑定"| UI
+    end
+

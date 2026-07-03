@@ -1,0 +1,33 @@
+%%{init: {'theme': 'neutral', 'themeVariables': {'fontSize': '24px'}}}%%
+flowchart LR
+    subgraph XS["XS (0–320vp)<br/>━━━━━━━━━━<br/>⌚ 手表"]
+        XS1["传感器列: 2<br/>设备列: 1<br/>内边距: 8"]
+    end
+
+    subgraph SM["SM (320–600vp)<br/>━━━━━━━━━━<br/>📱 手机竖屏"]
+        SM1["传感器列: 2<br/>设备列: 1<br/>内边距: 12"]
+    end
+
+    subgraph MD["MD (600–840vp)<br/>━━━━━━━━━━<br/>📱📖 折叠屏/小平板"]
+        MD1["传感器列: 3<br/>设备列: 2<br/>内边距: 16<br/>⬅ 启动 SideBar(220vp)"]
+    end
+
+    subgraph LG["LG (840–1440vp)<br/>━━━━━━━━━━<br/>📋 平板横屏"]
+        LG1["传感器列: 4<br/>设备列: 3<br/>内边距: 24"]
+    end
+
+    subgraph XL["XL (1440+vp)<br/>━━━━━━━━━━<br/>🖥️ 大屏/PC"]
+        XL1["传感器列: 6<br/>设备列: 4<br/>内边距: 32"]
+    end
+
+    XS --> SM --> MD --> LG --> XL
+
+    Narrow["🔽 窄屏模式<br/>Tabs(barPosition=End)<br/>底部 Tab 导航"]
+    Wide["🔽 宽屏模式<br/>SideNavBar(220vp)<br/>+ Navigation(Stack)"]
+
+    MD -.->|"isDualPane() = true"| Wide
+    XS -.->|"isDualPane() = false"| Narrow
+    SM -.->|"isDualPane() = false"| Narrow
+    LG -.-> Wide
+    XL -.-> Wide
+

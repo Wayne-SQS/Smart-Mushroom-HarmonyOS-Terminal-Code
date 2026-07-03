@@ -1,0 +1,38 @@
+%%{init: {'theme': 'neutral', 'themeVariables': {'fontSize': '18px'}}}%%
+flowchart TB
+    subgraph UI["📱 UI Layer"]
+        A1["DashboardPage"]
+        A2["DevicePage"]
+        A3["VideoMonitorPage"]
+    end
+
+    subgraph VM["🧠 ViewModel Layer"]
+        B1["DashboardViewModel"]
+        B2["DeviceViewModel"]
+        B3["AlertViewModel"]
+    end
+
+    subgraph SVC["⚙️ Service Layer"]
+        C1["IotService"]
+        C2["AppRouter"]
+        C3["ThemeManager"]
+    end
+
+    subgraph INFRA["🏗️ Infrastructure Layer"]
+        D1["Huawei IoTDA"]
+        D2["IAM Service"]
+        D3["PersistentStorage"]
+        D4["NetworkKit"]
+    end
+
+    A1 --> B1
+    A2 --> B2
+    A3 --> B3
+    B1 --> C1
+    B2 --> C1
+    B3 -.->|"派生"| B1
+    C1 --> D1
+    C1 --> D4
+    C1 --> D2
+    C3 --> D3
+

@@ -1,0 +1,38 @@
+%%{init: {'theme': 'neutral'}}%%
+flowchart TB
+    subgraph Hardware["🔌 ESP32 硬件层"]
+        ESP32["ESP32 开发板<br/>DHT11 / LDR / MQ2 / LED / 蜂鸣器"]
+        ESP32CAM["ESP32-CAM<br/>摄像头 + AI 推理"]
+    end
+
+    subgraph Cloud["☁️ 华为云 IoTDA"]
+        IOTDA["IoTDA 设备接入<br/>smartRoom 服务<br/>plantAI 服务"]
+        IAM["IAM 统一身份认证<br/>X-Subject-Token"]
+    end
+
+    subgraph Service["⚙️ features/core 服务层"]
+        IotSvc["IotService 单例<br/>━━━━━━━━━━<br/>authenticate()<br/>queryDeviceShadow()<br/>sendCommand()"]
+        Token["IotTokenManager<br/>token 缓存 23h<br/>提前 1 分钟刷新"]
+        Auth["IamAuthUtil<br/>HTTP POST 鉴权"]
+    end
+
+    subgraph ViewModel["📊 ViewModel 层"]
+        DVM["DashboardViewModel<br/>applyProperties()<br/>calculateStatus()<br/>乐观更新"]
+        AVM["AlertViewModel<br/>DeviceViewModel<br/>GrowthViewModel"]
+    end
+
+    subgraph UI["📱 ArkUI 页面层"]
+        Pages["DashboardPage / DevicePage<br/>MapPage / AlertPage<br/>GrowthPage / RecipePage<br/>VideoMonitorPage"]
+    end
+
+    ESP32 -->|"MQTT 协议"| IOTDA
+    ESP32CAM -->|"MQTT 协议"| IOTDA
+    IOTDA -->|"HTTP 查询/下发"| IotSvc
+    IAM -->|"签发 Token"| Auth
+    Auth -->|"X-Subject-Token"| Token
+    Token -->|"注入 Token"| IotSvc
+    IotSvc -->|"传感器属性"| DVM
+    IotSvc -->|"设备数据"| AVM
+    DVM -->|"[...vm.data]<br/>@State 绑定"| Pages
+    AVM -->|"[...vm.data]<br/>@State 绑定"| Pages
+

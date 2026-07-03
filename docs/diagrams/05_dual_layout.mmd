@@ -1,0 +1,32 @@
+%%{init: {'theme': 'neutral', 'themeVariables': {'fontSize': '24px'}}}%%
+flowchart TB
+    subgraph EntryPage["Index.ets build()"]
+        onArea["onAreaChange → 计算断点<br/>写入 AppStorage('currentBreakpoint')"]
+    end
+
+    onArea --> Decision{"isSideBarLayout() ?<br/>MD/LG/XL = true<br/>XS/SM = false"}
+
+    Decision -->|"false — 窄屏"| NarrowMode
+    Decision -->|"true — 宽屏"| WideMode
+
+    subgraph NarrowMode["📱 窄屏模式 (XS / SM)"]
+        Tabs["Tabs({ barPosition: BarPosition.End })"]
+        Tab1["TabContent[0]<br/>首页 Dashboard"]
+        Tab2["TabContent[1]<br/>设备 Device"]
+        Tab3["TabContent[2]<br/>地图 Map"]
+        Tab4["TabContent[3]<br/>我的 Profile"]
+        Tabs --- Tab1
+        Tabs --- Tab2
+        Tabs --- Tab3
+        Tabs --- Tab4
+    end
+
+    subgraph WideMode["🖥️ 宽屏模式 (MD / LG / XL)"]
+        direction LR
+        SideBar["SideNavBar<br/>━━━━━━━━<br/>左侧 220vp<br/>矢量图标 + 文字<br/>竖排导航"]
+        NavArea["Navigation({ mode: Stack })<br/>━━━━━━━━━━━━<br/>navPathStack 共享<br/>NavDestination builder"]
+        Content["当前页面内容<br/>Dashboard / Device /<br/>Map / Profile"]
+        SideBar --> NavArea
+        NavArea --> Content
+    end
+

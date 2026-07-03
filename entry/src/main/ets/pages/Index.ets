@@ -252,15 +252,13 @@ struct Index {
     }
   }
 
-  /** 蘑菇 Logo（侧栏顶部，36×36vp，纯几何） */
+  /** 蘑菇 Logo（侧栏顶部，36×36vp，像素风图标与应用图标统一） */
   @Builder
   MushroomLogo(color: string) {
-    Column({ space: -3 }) {
-      Circle({ width: 24, height: 24 }).fill(color)
-      Rect({ width: 12, height: 13 }).fill(color).borderRadius(3)
-    }
-    .width(36).height(36)
-    .justifyContent(FlexAlign.Center)
+    Image($r('app.media.ic_tab_home'))
+      .width(40)
+      .height(40)
+      .objectFit(ImageFit.Contain)
   }
 
   /** 侧栏导航（宽屏专用，毛玻璃底） */

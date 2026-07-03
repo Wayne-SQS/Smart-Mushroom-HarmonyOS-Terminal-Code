@@ -1,0 +1,12 @@
+%%{init: {'theme': 'neutral', 'themeVariables': {'fontSize': '18px'}}}%%
+flowchart TD
+    A["EntryAbility.onCreate()"] --> B["WindowStage.loadContent()"]
+    B --> C["Index.ets Entry Page"]
+    C --> D["AppRouter NavPathStack"]
+    D --> E["Navigation Stack Mode"]
+    E --> F{"Route Decision"}
+    F -->|"Home"| G["DashboardPage"]
+    F -->|"Device"| H["DevicePage"]
+    F -->|"Monitor"| I["VideoMonitorPage"]
+    F -->|"Profile"| J["ProfilePage"]
+

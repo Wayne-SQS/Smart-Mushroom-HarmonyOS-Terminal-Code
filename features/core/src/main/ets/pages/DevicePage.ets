@@ -349,9 +349,11 @@ export struct DevicePage {
   @Builder
   EmptyState() {
     Column() {
-      Text('📭')
-        .fontSize(48)
-        .opacity(0.4)
+      Image($r('app.media.empty_no_device'))
+        .width(96)
+        .height(96)
+        .objectFit(ImageFit.Contain)
+        .opacity(0.6)
       Text('没有匹配的设备')
         .fontSize(this.t().fontMd)
         .fontColor(this.t().textSub)

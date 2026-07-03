@@ -123,7 +123,7 @@ export struct LoginPage {
           ? [
             [this.t().bgPage, 0.0],
             ['#F6F1E4', 0.4],
-            ['#EEF6F0', 0.8],
+            ['#F2E8D5', 0.8],
             [this.t().bgPage, 1.0]
           ]
           : [

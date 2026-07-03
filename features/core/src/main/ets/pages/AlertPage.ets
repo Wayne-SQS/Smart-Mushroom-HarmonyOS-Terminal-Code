@@ -246,8 +246,10 @@ export struct AlertPage {
   @Builder
   EmptyState() {
     Column() {
-      Text('🌿')
-        .fontSize(64)
+      Image($r('app.media.empty_no_alert'))
+        .width(128)
+        .height(128)
+        .objectFit(ImageFit.Contain)
       Text('暂无告警，大棚运行正常')
         .fontSize(this.t().fontMd)
         .fontColor(this.t().textSub)

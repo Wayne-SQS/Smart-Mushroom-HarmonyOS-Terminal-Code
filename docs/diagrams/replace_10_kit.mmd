@@ -1,0 +1,30 @@
+%%{init: {'theme': 'neutral', 'themeVariables': {'fontSize': '18px'}}}%%
+flowchart TB
+    subgraph App["🟦 应用入口层"]
+        EA["EntryAbility<br/>@kit.AbilityKit<br/>@kit.ArkUI"]
+    end
+
+    subgraph Feature["🟧 业务逻辑层"]
+        IoT["IotService<br/>@kit.NetworkKit"]
+        Auth["IamAuthUtil<br/>@kit.NetworkKit"]
+        Crypto["IotAuthUtil<br/>@kit.CryptoArchitectureKit<br/>@kit.ArkTS"]
+        Video["VideoMonitorPage<br/>@kit.NetworkKit<br/>@kit.ImageKit"]
+    end
+
+    subgraph Common["🟩 公共能力层"]
+        MapC["MapViewComponent<br/>@kit.MapKit<br/>@kit.BasicServicesKit"]
+        Logger["Logger<br/>@kit.PerformanceAnalysisKit"]
+    end
+
+    subgraph Backup["🟫 系统服务"]
+        BEA["EntryBackupAbility<br/>@kit.CoreFileKit"]
+    end
+
+    App --> Feature
+    Feature --> Common
+    App -.-> Backup
+
+    style App fill:#e8e8e8,stroke:#555,stroke-width:2px
+    style Feature fill:#e8e8e8,stroke:#555,stroke-width:2px
+    style Common fill:#e8e8e8,stroke:#555,stroke-width:2px
+    style Backup fill:#e8e8e8,stroke:#555,stroke-width:2px

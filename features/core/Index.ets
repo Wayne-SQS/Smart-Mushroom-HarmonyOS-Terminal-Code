@@ -49,6 +49,10 @@ export { DeviceViewModel } from './src/main/ets/viewmodel/DeviceViewModel'
 export { GrowthViewModel } from './src/main/ets/viewmodel/GrowthViewModel'
 export { AlertViewModel } from './src/main/ets/viewmodel/AlertViewModel'
 
+// 可复用 UI 组件（主题驱动，零硬编码颜色）
+export { NumberRoller } from './src/main/ets/components/NumberRoller'
+export { SkeletonCard } from './src/main/ets/components/SkeletonCard'
+
 // 主题系统（双主题 + 毛玻璃 + 原子替换）
 export type { ThemeTokens } from './src/main/ets/theme/ThemeTokens'
 export { FROSTED_THEME } from './src/main/ets/theme/ThemeFrosted'

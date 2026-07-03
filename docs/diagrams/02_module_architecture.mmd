@@ -1,0 +1,36 @@
+%%{init: {'theme': 'neutral', 'themeVariables': {'fontSize': '18px'}}}%%
+flowchart TB
+    subgraph Entry["📦 entry (HAP) — 产品入口层"]
+        direction LR
+        E1["EntryAbility.ets<br/>UIAbility 入口"]
+        E2["Index.ets<br/>导航 + 多端布局"]
+        E3["AppRouter.ets<br/>全局路由单例"]
+        E4["IotConfig.ets<br/>凭证注入 (gitignored)"]
+    end
+
+    subgraph Features["📦 features/core (HAR) — 业务逻辑层"]
+        direction LR
+        F1["pages/<br/>10 个业务页面"]
+        F2["viewmodel/<br/>5 个 ViewModel"]
+        F3["service/<br/>IoT 服务 + 鉴权"]
+        F4["theme/<br/>双主题 Token"]
+        F5["model/<br/>数据模型"]
+    end
+
+    subgraph Common["📦 common/base (HAR) — 公共能力层"]
+        direction LR
+        C1["constants/<br/>断点 / 传感器 / 样式"]
+        C2["components/<br/>5 个 Canvas 图表"]
+        C3["utils/<br/>Logger / Capability"]
+    end
+
+    Entry -->|""依赖""| Features
+    Features -->|""依赖""| Common
+
+    F1 -.- F2 -.- F3
+    C1 -.- C2 -.- C3
+
+    X1["❌ 禁止反向依赖"] -.->|"common → features"| Features
+    X2["❌ 禁止横向调用"] -.->|"features ↔ features"| Features
+    X3["❌ 禁止反向依赖"] -.->|"features → entry"| Entry
+

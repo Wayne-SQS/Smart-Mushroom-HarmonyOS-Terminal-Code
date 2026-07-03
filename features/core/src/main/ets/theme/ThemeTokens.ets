@@ -82,6 +82,14 @@ export interface ThemeTokens {
   readonly shadowFloatRadius: number;
   readonly shadowFloatColor: string;
   readonly shadowFloatOffsetY: number;
+  /** 按压态阴影（卡片被按下时切换） */
+  readonly shadowPressedRadius: number;
+  readonly shadowPressedColor: string;
+  readonly shadowPressedOffsetY: number;
+  /** 禁用态阴影（按钮/卡片禁用时切换） */
+  readonly shadowDisabledRadius: number;
+  readonly shadowDisabledColor: string;
+  readonly shadowDisabledOffsetY: number;
 
   // ==================== 毛玻璃 ====================
   /** backdropBlur 强度（黑白主题=0，条件化设置避免无效渲染） */
@@ -92,6 +100,11 @@ export interface ThemeTokens {
   readonly textOnDanger: string;
   readonly textOnWarning: string;
 
+  // ==================== 禁用态 ====================
+  readonly disabled: string;        // 禁用背景
+  readonly disabledText: string;    // 禁用文字
+  readonly disabledBorder: string;  // 禁用边框
+
   // ==================== 字号（小字号场景；大字号场景用 AdaptiveUtils 断点自适应） ====================
   readonly fontXs: number;
   readonly fontSm: number;
@@ -99,6 +112,23 @@ export interface ThemeTokens {
   readonly fontLg: number;
   readonly fontXl: number;
   readonly fontXxl: number;
+
+  // ==================== 字重 ====================
+  readonly fontWeightTitle: number;   // 标题 Medium 500
+  readonly fontWeightBody: number;    // 正文 Regular 400
+  readonly fontWeightHint: number;    // 提示 Light 300
+  readonly fontWeightButton: number;  // 按钮 Medium 500
+  readonly fontWeightMono: number;    // 数值 Bold 700
+
+  // ==================== 字体族 ====================
+  /** 等宽字体族名（传感器数值专用，对齐整齐不跳动） */
+  readonly fontMonoFamily: string;
+
+  // ==================== 卡片质感 ====================
+  /** 卡片顶部 1px 高光描边色（极淡，增强立体层次） */
+  readonly cardHighlightColor: string;
+  /** 高光描边宽度（vp） */
+  readonly cardHighlightWidth: number;
 
   // ==================== 动画 ====================
   readonly animationEnabled: boolean;

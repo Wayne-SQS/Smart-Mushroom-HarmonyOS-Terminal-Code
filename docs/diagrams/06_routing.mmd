@@ -1,0 +1,29 @@
+%%{init: {'theme': 'neutral'}}%%
+flowchart TD
+    User["👤 用户操作<br/>点击卡片 / 按钮"]
+
+    Router["AppRouter 单例<br/>━━━━━━━━━━<br/>push('AlertPage')<br/>pushWithParam('VideoMonitorPage', param)<br/>pop()"]
+
+    Stack["NavPathStack 全局路由栈<br/>━━━━━━━━━━━━<br/>AppStorage('navPathStack')<br/>跨模块共享"]
+
+    Nav["Navigation 组件<br/>━━━━━━━━━━<br/>mode: NavigationMode.Stack<br/>.navDestination(this.PageDestination)"]
+
+    Builder["@Builder PageDestination(name)<br/>━━━━━━━━━━━━━━━━<br/>if/else 分支工厂<br/>(ArkTS 不支持动态属性访问)"]
+
+    AP["AlertPage"]
+    GP["GrowthPage"]
+    RP["RecipePage"]
+    VP["VideoMonitorPage"]
+    DP["DashboardPage"]
+
+    User --> Router
+    Router --> Stack
+    Stack --> Nav
+    Nav --> Builder
+
+    Builder --> AP
+    Builder --> GP
+    Builder --> RP
+    Builder --> VP
+    Builder --> DP
+

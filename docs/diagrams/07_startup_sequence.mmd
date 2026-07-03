@@ -1,0 +1,37 @@
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    autonumber
+    participant System as 🖥️ 鸿蒙系统
+    participant Entry as EntryAbility<br/>(UIAbility)
+    participant Window as WindowStage
+    participant Index as Index.ets<br/>(@Entry)
+    participant Iot as IotService<br/>单例
+    participant Theme as ThemeManager<br/>单例
+    participant AppS as AppStorage<br/>全局状态
+
+    System->>Entry: onCreate(want, launchParam)
+    Entry->>Entry: context.setColorMode(COLOR_MODE_LIGHT)
+    Entry->>Iot: getInstance().init(IOT_CONFIG)
+    Iot->>Iot: authenticate() → IAM Token 缓存
+    Entry->>Theme: getInstance().init()
+    Theme->>AppS: 从 PersistentStorage 恢复 themeName
+    Entry-->>System: onCreate() 完成
+
+    System->>Entry: onWindowStageCreate(windowStage)
+    Entry->>Window: windowStage.loadContent('pages/Index')
+    Window->>Index: 创建 Index 组件
+
+    System->>Index: aboutToAppear()
+    Index->>AppS: setOrCreate('navPathStack', stack)
+    Index->>AppS: setOrCreate('currentBreakpoint', 'sm')
+
+    System->>Index: build()
+    Index->>Index: onAreaChange → 计算断点
+    Index->>AppS: setOrCreate('currentBreakpoint', bp)
+    alt 窄屏 (XS/SM)
+        Index->>Index: Tabs(barPosition=End) + 4 TabContent
+    else 宽屏 (MD/LG/XL)
+        Index->>Index: SideNavBar(220vp) + Navigation(Stack)
+    end
+
+    Note over Index,AppS: 所有子页面通过 @StorageLink 响应断点/主题变化

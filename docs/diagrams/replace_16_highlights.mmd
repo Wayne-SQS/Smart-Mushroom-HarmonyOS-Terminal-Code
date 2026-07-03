@@ -1,0 +1,17 @@
+%%{init: {'theme': 'neutral', 'themeVariables': {'fontSize': '20px'}}}%%
+flowchart LR
+    A["1. Stage Model<br/>UIAbility<br/>三步初始化"]
+    B["2. 三层架构<br/>HAR/HAR/HAP<br/>单向依赖"]
+    C["3. 多端部署<br/>五档断点<br/>GridRow/Col"]
+    D["4. 双模式入口<br/>Tabs + SideNavBar<br/>Navigation(Stack)"]
+    E["5. 状态管理<br/>@State/Prop/Link<br/>@StorageLink"]
+    F["6. 双主题<br/>PersistentStorage<br/>菌菇棕 / 黑白"]
+
+    A --> B --> C --> D --> E --> F
+
+    G["7. IoT 全链路<br/>IAM + Token<br/>设备影子 + 命令"]
+    H["8. 10 Kit 集成<br/>MapKit+Canvas<br/>canIUse 降级"]
+    I["9. Canvas 图表<br/>柱状/折线/仪表<br/>零第三方依赖"]
+    J["10. 工程规范<br/>caseSensitive<br/>hypium + 凭证隔离"]
+
+    F --> G --> H --> I --> J

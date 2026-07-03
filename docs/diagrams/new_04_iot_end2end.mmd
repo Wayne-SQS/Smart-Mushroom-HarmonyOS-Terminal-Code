@@ -1,0 +1,15 @@
+%%{init: {'theme': 'neutral', 'themeVariables': {'fontSize': '18px'}}}%%
+flowchart TD
+    A["ESP32-CAM / Sensor Device"] --> B["MQTT / TCP Protocol"]
+    B --> C["Huawei IoTDA Cloud"]
+    C --> D["IotService + NetworkKit"]
+
+    D --> E["IamAuthUtil<br/>IAM Token 鉴权"]
+    D --> F["IotTokenManager<br/>Token 缓存 (23h + refresh)"]
+    D --> G["ViewModel Layer<br/>数据加工与状态计算"]
+
+    G --> H["ArkUI Pages<br/>@State 绑定渲染"]
+    H --> I["User Interaction<br/>控制指令下发"]
+    I -.->|"闭环反馈"| G
+    G -.->|"命令下发"| D
+

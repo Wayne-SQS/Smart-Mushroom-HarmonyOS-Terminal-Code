@@ -10,10 +10,11 @@ import { ThemeTokens } from './ThemeTokens';
 export const CONTRAST_THEME: ThemeTokens = {
   name: 'contrast',
 
-  // 品牌
-  primary: '#000000',
-  primaryLight: '#333333',
-  primaryDark: '#000000',
+  // 品牌（接菌菇棕点缀：primary 改为深棕，白字对比度 5.8:1 达 AA；
+  //   保持黑白主调——仅按钮/选中态用棕色，背景仍纯黑纯白）
+  primary: '#8B5A2B',      // 深菌菇棕（按钮底，达 AA 对比度）
+  primaryLight: '#C68642', // 浅菌菇棕（hover/进度底）
+  primaryDark: '#5C3A1E',  // 更深棕（按下态）
   accent: '#0052D9',
   accentLight: '#EBF2FF',
 
@@ -31,7 +32,7 @@ export const CONTRAST_THEME: ThemeTokens = {
   bgOverlay: '#73000000',
   bgTabBar: '#FFFFFF',
 
-  // Header 渐变
+  // Header 渐变（保持纯黑，保证极致对比）
   headerGradientTop: '#000000',
   headerGradientBottom: '#000000',
 
@@ -76,6 +77,14 @@ export const CONTRAST_THEME: ThemeTokens = {
   shadowFloatRadius: 8,
   shadowFloatColor: '#26000000',
   shadowFloatOffsetY: 4,
+  // 按压态：极淡黑投影，保持极简风
+  shadowPressedRadius: 1,
+  shadowPressedColor: '#28000000',
+  shadowPressedOffsetY: 0,
+  // 禁用态：无投影
+  shadowDisabledRadius: 0,
+  shadowDisabledColor: '#00000000',
+  shadowDisabledOffsetY: 0,
 
   // 毛玻璃
   blurAmount: 0,
@@ -85,6 +94,11 @@ export const CONTRAST_THEME: ThemeTokens = {
   textOnDanger: '#FFFFFF',
   textOnWarning: '#000000',
 
+  // 禁用态（中性灰，与黑白主调一致）
+  disabled: '#E5E5E5',
+  disabledText: '#B0B0B0',
+  disabledBorder: '#D5D5D5',
+
   // 字号
   fontXs: 10,
   fontSm: 13,
@@ -92,6 +106,20 @@ export const CONTRAST_THEME: ThemeTokens = {
   fontLg: 18,
   fontXl: 22,
   fontXxl: 34,
+
+  // 字重（黑白主题强调对比，标题用 SemiBold 600）
+  fontWeightTitle: 600,    // SemiBold
+  fontWeightBody: 400,     // Regular
+  fontWeightHint: 300,     // Light
+  fontWeightButton: 600,   // SemiBold
+  fontWeightMono: 700,     // Bold（数值强调）
+
+  // 字体族（传感器数值专用等宽）
+  fontMonoFamily: 'HarmonyOS Sans Mono',
+
+  // 卡片质感（顶部 1px 高光，黑白主题用极淡灰）
+  cardHighlightColor: '#FAFAFA',
+  cardHighlightWidth: 1,
 
   // 动画
   animationEnabled: false,

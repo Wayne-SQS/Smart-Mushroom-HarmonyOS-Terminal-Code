@@ -1,0 +1,39 @@
+%%{init: {'theme': 'neutral', 'themeVariables': {'fontSize': '18px'}}}%%
+flowchart TB
+    subgraph Init["🟢 启动初始化"]
+        Step1["ThemeManager.init()"]
+    end
+
+    subgraph Storage["💾 PersistentStorage"]
+        Disk["persistProp('themeName', 'frosted')  — 磁盘持久化"]
+    end
+
+    subgraph Global["🌐 AppStorage"]
+        AS["themeName: 'frosted' 或 'contrast'  — 全局唯一真相源"]
+    end
+
+    subgraph Manager["🎨 ThemeManager 单例"]
+        TM["current: ThemeTokens"]
+        Tokens["50+ 属性: 品牌色,背景,文字,圆角,阴影,字号,毛玻璃"]
+    end
+
+    subgraph Pages["📄 全部10个业务页面"]
+        P1["@StorageLink('themeName') + @Watch('onThemeChange')"]
+        P2["t() → ThemeManager.getTokens()"]
+        P3["build() 中消费: backgroundColor, backdropBlur 等"]
+    end
+
+    subgraph UserAct["👤 用户操作"]
+        Switch["ProfilePage 切换主题按钮"]
+    end
+
+    Disk <==>|自动同步| AS
+    AS -.->|读取| Step1
+    Step1 -->|同步| TM
+    TM -->|持有| Tokens
+    Switch -->|写入| AS
+    AS ==>|触发 rebuild| P1
+    P1 --> P2
+    P2 --> P3
+    P3 -->|调用| TM
+

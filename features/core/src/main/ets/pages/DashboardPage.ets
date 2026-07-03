@@ -46,6 +46,9 @@ export struct DashboardPage {
   @State pulseScale: number = 1;
   @State pulsingId: string = '';
 
+  // 卡片按压回弹状态（按下时 scale 0.97，抬起回弹）
+  @State pressedId: string = '';
+
   // 卡片 stagger 入场
   @State cardEntrance: number = 0; // 0→6，每完成一张 +1
   private staggerTimers: number[] = [];
@@ -373,6 +376,15 @@ export struct DashboardPage {
           ]
         })
 
+      // 噪点纹理：极淡白点叠加磨砂质感（仅雾透主题；PNG 自身 alpha 极低，无需再降 opacity）
+      if (this.t().animationEnabled) {
+        Image($r('app.media.noise_header_texture'))
+          .width('100%')
+          .height(180)
+          .objectFit(ImageFit.Cover)
+          .opacity(0.6)
+      }
+
       // 装饰光晕仅雾透主题使用；黑白主题保持纯黑 Header
       if (this.t().animationEnabled) {
         Ellipse()
@@ -540,6 +552,14 @@ export struct DashboardPage {
   @Builder
   SensorCard(item: SensorDataItem, index: number) {
     Stack() {
+      // 顶部 1px 高光描边（极淡暖白，增强立体层次；position 固定顶部）
+      Row()
+        .width('100%')
+        .height(this.t().cardHighlightWidth)
+        .backgroundColor(this.t().cardHighlightColor)
+        .borderRadius({ topLeft: this.t().radiusMd, topRight: this.t().radiusMd })
+        .position({ x: 0, y: 0 })
+
       // 状态光晕仅雾透主题；黑白主题用边框色条区分状态
       if (this.t().animationEnabled) {
         Ellipse()
@@ -568,12 +588,13 @@ export struct DashboardPage {
         }
         .width('100%')
 
-        // 数值 + 单位（大字号走 AdaptiveUtils 断点自适应）
+        // 数值 + 单位（大字号走 AdaptiveUtils 断点自适应；数值用等宽字体对齐不跳动）
         Row() {
           Text(item.value.toFixed(1))
             .fontSize(AdaptiveUtils.getSensorDataFontSize(this.currentBreakpoint))
             .fontColor(this.t().textTitle)
-            .fontWeight(FontWeight.Bold)
+            .fontFamily(this.t().fontMonoFamily)
+            .fontWeight(this.t().fontWeightMono)
           Text(SensorConfigUtil.getConfig(item.type as SensorType).unit)
             .fontSize(this.t().fontXs)
             .fontColor(this.t().textSub)
@@ -602,6 +623,20 @@ export struct DashboardPage {
       offsetX: 0,
       offsetY: this.t().shadowCardOffsetY
     })
+    // 按压回弹：按下 scale 0.97，抬起弹性回弹 1.0（animation 自动补间）
+    .scale({
+      x: this.pressedId === item.type ? 0.97 : 1,
+      y: this.pressedId === item.type ? 0.97 : 1
+    })
+    .animation({ duration: 150, curve: Curve.EaseOut })
+    .onTouch((event: TouchEvent) => {
+      if (event.type === TouchType.Down) {
+        this.pressedId = item.type;
+      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+        this.pressedId = '';
+      }
+    })
+    .onClick(() => this.triggerPulse(item.type))
   }
 
   // ==================== 趋势图（毛玻璃卡片） ====================
