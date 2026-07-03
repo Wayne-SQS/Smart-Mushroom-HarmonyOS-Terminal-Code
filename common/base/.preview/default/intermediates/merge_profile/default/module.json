@@ -1,0 +1,33 @@
+{
+	"app": {
+		"bundleName": "com.example.softwareaction",
+		"debug": true,
+		"versionCode": 1000000,
+		"versionName": "1.0.0",
+		"minAPIVersion": 60101024,
+		"targetAPIVersion": 60101024,
+		"apiReleaseType": "Release",
+		"targetMinorAPIVersion": 0,
+		"targetPatchAPIVersion": 0,
+		"compileSdkVersion": "6.1.1.125",
+		"compileSdkType": "HarmonyOS",
+		"appEnvironments": [],
+		"bundleType": "app",
+		"buildMode": "debug"
+	},
+	"module": {
+		"name": "common_base",
+		"type": "har",
+		"description": "Common base utilities for SoftwareAction",
+		"deviceTypes": [
+			"phone",
+			"tablet",
+			"2in1",
+			"car",
+			"wearable",
+			"tv"
+		],
+		"packageName": "common-base",
+		"installationFree": false
+	}
+}

@@ -57,7 +57,9 @@ export class IamAuthUtil {
       const response = await httpRequest.request(url, {
         method: http.RequestMethod.POST,
         header: { 'Content-Type': 'application/json' },
-        extraData: JSON.stringify(requestBody)
+        extraData: JSON.stringify(requestBody),
+        connectTimeout: 5000,
+        readTimeout: 5000
       });
 
       // IAM 接口成功返回 201

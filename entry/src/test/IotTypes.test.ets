@@ -196,11 +196,11 @@ export default function iotTypesTest() {
         expect(AdaptiveUtils.isDualPane(BreakpointConstants.MD)).assertTrue();
       });
 
-      it('should return true for lg breakpoint', 0, () => {
+      it('isDualPane should return true for lg breakpoint', 0, () => {
         expect(AdaptiveUtils.isDualPane(BreakpointConstants.LG)).assertTrue();
       });
 
-      it('should return true for xl breakpoint', 0, () => {
+      it('isDualPane should return true for xl breakpoint', 0, () => {
         expect(AdaptiveUtils.isDualPane(BreakpointConstants.XL)).assertTrue();
       });
 
@@ -218,27 +218,27 @@ export default function iotTypesTest() {
     });
 
     describe('AdaptiveUtils.isLargeScreen', () => {
-      it('should return true for lg breakpoint', 0, () => {
+      it('isLargeScreen should return true for lg breakpoint', 0, () => {
         expect(AdaptiveUtils.isLargeScreen(BreakpointConstants.LG)).assertTrue();
       });
 
-      it('should return true for xl breakpoint', 0, () => {
+      it('isLargeScreen should return true for xl breakpoint', 0, () => {
         expect(AdaptiveUtils.isLargeScreen(BreakpointConstants.XL)).assertTrue();
       });
 
-      it('should return false for xs breakpoint', 0, () => {
+      it('isLargeScreen should return false for xs breakpoint', 0, () => {
         expect(AdaptiveUtils.isLargeScreen(BreakpointConstants.XS)).assertFalse();
       });
 
-      it('should return false for sm breakpoint', 0, () => {
+      it('isLargeScreen should return false for sm breakpoint', 0, () => {
         expect(AdaptiveUtils.isLargeScreen(BreakpointConstants.SM)).assertFalse();
       });
 
-      it('should return false for md breakpoint', 0, () => {
+      it('isLargeScreen should return false for md breakpoint', 0, () => {
         expect(AdaptiveUtils.isLargeScreen(BreakpointConstants.MD)).assertFalse();
       });
 
-      it('should return false for unknown breakpoint', 0, () => {
+      it('isLargeScreen should return false for unknown breakpoint', 0, () => {
         expect(AdaptiveUtils.isLargeScreen('unknown')).assertFalse();
       });
     });

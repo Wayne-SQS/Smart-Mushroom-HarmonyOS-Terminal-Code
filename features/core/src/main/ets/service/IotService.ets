@@ -146,7 +146,9 @@ export class IotService {
         header: {
           'Content-Type': 'application/json',
           'X-Auth-Token': token
-        }
+        },
+        connectTimeout: 5000,
+        readTimeout: 5000
       });
       httpRequest.destroy();
 
@@ -238,7 +240,9 @@ export class IotService {
           'Content-Type': 'application/json',
           'X-Auth-Token': token
         },
-        extraData: JSON.stringify(body)
+        extraData: JSON.stringify(body),
+        connectTimeout: 5000,
+        readTimeout: 5000
       });
       httpRequest.destroy();
 

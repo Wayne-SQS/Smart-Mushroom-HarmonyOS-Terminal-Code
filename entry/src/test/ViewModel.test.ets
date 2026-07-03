@@ -114,7 +114,7 @@ export default function viewModelTest() {
     });
 
     describe('DashboardViewModel loadData (IoT unavailable, mock fallback)', () => {
-      it('loadData should set isLoading=false after completion', 0, async () => {
+      it('DashboardViewModel.loadData should set isLoading=false after completion', 0, async () => {
         const vm: DashboardViewModel = new DashboardViewModel();
         await vm.loadData();
         expect(vm.isLoading).assertFalse();
@@ -355,7 +355,7 @@ export default function viewModelTest() {
     });
 
     describe('AlertViewModel loadData', () => {
-      it('loadData should set isLoading=false after completion', 0, async () => {
+      it('AlertViewModel.loadData should set isLoading=false after completion', 0, async () => {
         const vm: AlertViewModel = new AlertViewModel();
         await vm.loadData();
         expect(vm.isLoading).assertFalse();
