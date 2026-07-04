@@ -187,7 +187,7 @@ export struct DevicePage {
 
           Text('+ 添加')
             .fontSize(this.t().fontMd)
-            .fontColor(this.t().textWhite)
+            .fontColor(this.t().primary)
             .padding({ left: 14, right: 14, top: 8, bottom: 8 })
             .backgroundColor(this.t().bgCardLight)
             .borderRadius(this.t().radiusSm)
@@ -276,10 +276,10 @@ export struct DevicePage {
 
       // 状态筛选 chips
       Row() {
-        this.FilterChip('全部', '', this.statusFilter === '')
-        this.FilterChip('在线', 'online', this.statusFilter === 'online')
-        this.FilterChip('离线', 'offline', this.statusFilter === 'offline')
-        this.FilterChip('故障', 'fault', this.statusFilter === 'fault')
+        this.FilterChip('全部', '')
+        this.FilterChip('在线', 'online')
+        this.FilterChip('离线', 'offline')
+        this.FilterChip('故障', 'fault')
       }
       .width('100%')
       .margin({ top: 8 })
@@ -293,13 +293,13 @@ export struct DevicePage {
   }
 
   @Builder
-  FilterChip(label: string, filterKey: string, isActive: boolean) {
+  FilterChip(label: string, filterKey: string) {
     Text(label)
       .fontSize(this.t().fontXs)
-      .fontColor(isActive ? this.t().textWhite : this.t().textSub)
-      .fontWeight(isActive ? FontWeight.Medium : FontWeight.Normal)
+      .fontColor(this.statusFilter === filterKey ? this.t().textWhite : this.t().textSub)
+      .fontWeight(this.statusFilter === filterKey ? FontWeight.Medium : FontWeight.Normal)
       .padding({ left: 12, right: 12, top: 4, bottom: 4 })
-      .backgroundColor(isActive ? this.t().primary : this.t().bgCardLight)
+      .backgroundColor(this.statusFilter === filterKey ? this.t().primary : this.t().bgCardLight)
       .borderRadius(14)
       .margin({ right: 8 })
       .onClick(() => {
