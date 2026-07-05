@@ -17,7 +17,7 @@ export const FROSTED_THEME: ThemeTokens = {
 
   // 品牌（菌菇棕系，与应用图标 #B07A3E 同系）— 仅作点缀，不作背景
   primary: '#C68642',      // 菌菇棕（主按钮、选中态、装饰）
-  primaryLight: '#E0B58A', // 浅菌菇（hover、进度条底色、图表条）
+  primaryLight: '#D4A06A', // 中菌菇棕（hover、进度条底色、图表条）— 比原来 #E0B58A 更深更饱和
   primaryDark: '#8B5A2B',  // 深菌菇（按下态，白字对比度 5.8:1 达标）
   accent: '#7A9E6E',       // 状态绿（蘑菇+植物，强调色）
   accentLight: '#C9DBBF', // 浅草绿（选中背景）
@@ -32,7 +32,7 @@ export const FROSTED_THEME: ThemeTokens = {
   // 背景（中性白系，避免大面积泛黄；均为不透明 6 位 hex）
   bgPage: '#F5F6F7',       // 暖灰白（接近纯白，微暖不黄）
   bgCard: '#FFFFFF',       // 纯白卡片
-  bgCardLight: '#F8F9FA', // 极浅灰白（次级卡片）
+  bgCardLight: '#E8E8E8', // 浅灰（次级卡片/非选中按钮背景）— 比原来 #F8F9FA 明显加深，确保可见
   bgOverlay: '#E8E8E8',    // 弹窗遮罩
   bgTabBar: '#FFFFFF',     // 底部导航
 
@@ -51,7 +51,7 @@ export const FROSTED_THEME: ThemeTokens = {
   // 边框 & 分割线（中性灰，避免暖色边框叠加泛黄）
   divider: '#E8E8E8',       // 中性分割线
   border: '#DDDDDD',        // 中性边框
-  borderLight: '#EFEFEF',   // 极淡边
+  borderLight: '#DCDCDC',   // 浅灰边 — 比原来 #EFEFEF 加深以便看清按钮边框
 
   // 传感器配色（仅供装饰，严禁作为文字色；均为 6 位 hex 土系）
   colorTemp: '#E8A87C',     // 暖陶（温度）
@@ -99,9 +99,9 @@ export const FROSTED_THEME: ThemeTokens = {
   textOnWarning: '#3D2E00',  // 深棕字配琥珀底
 
   // 禁用态（中性灰，避免棕色加重泛黄）
-  disabled: '#F0F0F0',        // 浅灰背景
-  disabledText: '#BFBFBF',   // 浅灰文字（对比度 < AA，仅装饰）
-  disabledBorder: '#E8E8E8', // 极淡边框
+  disabled: '#DDDDDD',        // 中灰背景（禁用态按钮）— 比原来 #F0F0F0 加深，更清晰可辨
+  disabledText: '#999999',   // 中灰文字（禁用态）— 比原来 #BFBFBF 更深，提升可读性
+  disabledBorder: '#D0D0D0', // 中灰边框 — 比原来 #E8E8E8 更明显
 
   // 字号（小字号场景；大字号场景用 AdaptiveUtils 断点自适应）
   fontXs: 10,

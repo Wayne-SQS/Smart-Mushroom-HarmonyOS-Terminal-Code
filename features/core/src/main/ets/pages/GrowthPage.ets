@@ -47,7 +47,7 @@ export struct GrowthPage {
         .fontSize(this.t().fontMd)
         .fontColor(this.t().textWhite)
         .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-        .backgroundColor(this.t().bgCardLight)
+        .backgroundColor(this.t().primaryDark)
         .borderRadius(this.t().radiusSm)
     }
     .width('100%')

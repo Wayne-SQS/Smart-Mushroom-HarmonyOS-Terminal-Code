@@ -6,11 +6,16 @@
 
 一套基于 **HarmonyOS ArkTS + ArkUI** 的蘑菇大棚物联网管理系统，通过华为云 IoTDA 接入 ESP32 系列硬件设备，实现环境监测、远程控制、AI 植物识别、视频监控、地图定位与数据可视化。
 
+本项目包含两大组件：
+- **鸿蒙端**（`entry/` + `features/` + `common/`）— HarmonyOS 应用，提供可视化交互界面
+- **侧边端**（`sidecar/`）— Python AI 服务端，提供蘑菇病害 AI 识别能力，**需在鸿蒙端启动前运行**
+
 ---
 
 ## 📖 目录
 
 - [功能一览](#-功能一览)
+- [侧边端](#-侧边端)
 - [技术架构](#-技术架构)
 - [项目结构](#-项目结构)
 - [快速开始](#-快速开始)
@@ -76,6 +81,53 @@
 
 ---
 
+## 🤖 侧边端
+
+侧边端是基于 Python 的 AI 识别服务，运行在电脑上，通过**华为云 IoTDA** 与鸿蒙端联动，为鸿蒙端提供 AI 病害识别能力。
+
+> ⚠️ **侧边端需在鸿蒙端启动前运行**
+
+### 功能
+- **MQTT 命令监听** — 订阅华为云 IoTDA 命令 Topic，接收 `recognizeOnce` 指令
+- **摄像头截图** — 收到命令后截图当前摄像头画面
+- **AI 病害识别** — 使用 MushroomCNN 3分类模型识别蘑菇病害状态（健康菌丝 / 单一感染 / 混合感染）
+- **结果上报** — 将识别结果上报至华为云设备属性，鸿蒙端读取展示
+
+### 项目结构
+
+```
+sidecar/
+├── ai_model/                              # AI 模型相关
+│   ├── mushroom_cnn.pth                   # 训练好的 CNN 模型权重
+│   ├── mushroom_train.ipynb               # 蘑菇病害3分类 CNN 训练代码
+│   └── mushroom_test.ipynb                # 模型测试 / 单张图片预测
+├── integration/                           # 华为云集成
+│   └── 华为云_摄像头_AI识别_完整集成.ipynb    # 完整集成：命令订阅 + 截图 + AI识别 + 结果上报
+├── captures/                              # 运行时自动生成：摄像头截图存放目录
+├── requirements.txt                       # Python 依赖清单
+└── README.md                              # 侧边端详细说明文档
+```
+
+### 数据流
+
+```
+IoTDA 控制台 / 鸿蒙端 下发 recognizeOnce 命令
+        ↓
+侧边端 MQTT 收到命令
+        ↓
+摄像头截图（captures/ 目录）
+        ↓
+MushroomCNN AI 模型识别（3分类）
+        ↓
+属性上报（plantStatus / confidence / captureTime）
+        ↓
+回复命令执行结果
+```
+
+详见 [sidecar/README.md](sidecar/README.md)
+
+---
+
 ## 🏗️ 技术架构
 
 ```
@@ -91,6 +143,13 @@
 │            common/base (HAR)             │
 │  公共组件 · 工具类 · 常量 · 图表         │
 │  BarChart / LineChart / Gauge / MapView  │
+└─────────────────────────────────────────┘
+       ⬆ 鸿蒙端通过 IoTDA 与侧边端联动
+┌─────────────────────────────────────────┐
+│            sidecar (侧边端)                │
+│  Python AI 服务 · MQTT 命令监听          │
+│  摄像头截图 · MushroomCNN 病害识别        │
+│  结果上报至华为云 IoTDA                   │
 └─────────────────────────────────────────┘
 ```
 
@@ -118,6 +177,10 @@ entry → features/core → common/base
 | 构建 | Hvigor |
 | 测试 | `@ohos/hypium` + `@ohos/hamock` |
 | API 版本 | 6.1.1(24) |
+| 侧边端语言 | Python ≥ 3.10 |
+| AI 框架 | PyTorch ≥ 2.0.0 |
+| 摄像头 | OpenCV (cv2) |
+| MQTT | paho-mqtt |
 
 ---
 
@@ -178,6 +241,17 @@ SoftwareAction/
 │           ├── Logger.ets              # 日志
 │           └── CapabilityUtils.ets     # 设备能力检测
 │
+├── sidecar/                            # 侧边端（Python AI 服务端）
+│   ├── ai_model/                       # AI 模型
+│   │   ├── mushroom_cnn.pth            # 训练好的 CNN 模型权重
+│   │   ├── mushroom_train.ipynb        # 蘑菇病害3分类训练代码
+│   │   └── mushroom_test.ipynb         # 模型测试代码
+│   ├── integration/                    # 华为云集成
+│   │   └── 华为云_摄像头_AI识别_完整集成.ipynb
+│   ├── captures/                       # 运行时：摄像头截图存放目录
+│   ├── requirements.txt                # Python 依赖
+│   └── README.md                       # 侧边端说明
+│
 ├── docs/                               # 设计文档 & 知识库
 │   ├── harmony-kb.md                   # HarmonyOS 开发知识库
 │   ├── 鸿蒙技术开发文档.docx            # 完整技术文档（24 张图）
@@ -201,14 +275,41 @@ SoftwareAction/
 
 ### 环境要求
 
-| 工具 | 版本 |
+| 工具 / 环境 | 版本 |
 |------|------|
 | DevEco Studio | ≥ 5.0.3 |
 | HarmonyOS SDK | API 6.1.1(24) |
 | Node.js | ≥ 18.x |
 | ohpm | ≥ 1.3.x |
+| Python | ≥ 3.10 |
+| PyTorch | ≥ 2.0.0 |
 
-### 构建 & 运行
+### 启动顺序
+
+> ⚠️ **必须先启动侧边端，再启动鸿蒙端**，否则 AI 识别功能不可用。
+
+#### 第1步：启动侧边端（Python AI 服务）
+
+```bash
+cd sidecar
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 方式 A：使用 Jupyter Notebook 运行集成代码
+jupyter notebook integration/华为云_摄像头_AI识别_完整集成.ipynb
+# 依次运行：第1步单元格 → 第2步单元格（保持运行）
+
+# 方式 B：先测试 AI 模型
+jupyter notebook ai_model/mushroom_test.ipynb
+```
+
+侧边端启动后，会：
+1. 连接华为云 IoTDA（MQTT over TLS）
+2. 订阅命令 Topic
+3. 等待 `recognizeOnce` 命令
+
+#### 第2步：构建 & 运行鸿蒙端
 
 ```bash
 # 1. 克隆仓库
@@ -252,6 +353,8 @@ export const IOT_CONFIG: IotAppConfig = {
 
 > ⚠️ `IotConfig.ets` 包含真实凭证，已通过 `.gitignore` 排除提交。模板文件 `IotConfig.example.ets` 可以安全提交。
 
+> ⚠️ 侧边端中 `integration/华为云_摄像头_AI识别_完整集成.ipynb` 的 IoTDA 连接参数需与鸿蒙端对应同一个设备。
+
 ---
 
 ## 📡 IoT 数据流
@@ -266,22 +369,28 @@ ESP32 硬件
   ├── 风扇 (通风)
   ├── 空调
   ├── 蜂鸣器
-  └── ESP32-CAM (AI + 视频)
+  └── ESP32-CAM (视频流)
         │
         ▼ MQTT
   华为云 IoTDA
         │
-        ▼ HTTP (IAM Token 鉴权)
-  IotService
+        ├── HTTP (IAM Token 鉴权) → IotService → ViewModel → ArkUI
         │
-        ▼
-  ViewModel (数据转换 + 状态计算)
-        │
-        ▼
-  @State → ArkUI 页面渲染
+        └── MQTT 命令下发 ──→ 侧边端（Python AI 服务）
+                                   │
+                                   ├── 收到 recognizeOnce 命令
+                                   ├── 摄像头截图
+                                   ├── MushroomCNN AI 识别
+                                   └── 结果上报至 IoTDA 属性
 ```
 
-**命令下发路径：**
+**命令下发路径（AI 识别）：**
+```
+鸿蒙端下发 recognizeOnce → IoTDA 同步命令 → 侧边端 MQTT 接收
+  → 摄像头截图 → AI 识别 → 属性上报 → 鸿蒙端读取展示
+```
+
+**命令下发路径（控制）：**
 ```
 用户点击控制按钮 → IotService.sendCommand()
   → IoTDA 同步命令 → ESP32 执行 → 设备影子更新
@@ -321,6 +430,7 @@ ESP32 硬件
 - [x] NumberRoller 数字滚动 + SkeletonCard 骨架屏组件
 - [x] 登录页（蘑菇插画 + 主题感知渐变）
 - [x] 技术文档完善（24 张技术架构图）
+- [x] **侧边端 Python AI 服务** — MushroomCNN 病害识别 + 华为云集成 + 摄像头截图
 
 ### 🚧 进行中 / 计划
 
@@ -353,12 +463,13 @@ bugfix/xxx        — 修复分支
 <type>(<scope>): <subject>
 
 type:   feat / fix / refactor / style / docs / test / chore
-scope:  common / feature / product / ui / api
+scope:  common / feature / product / ui / api / sidecar
 ```
 
 示例：
 ```
 feat(feature): 新增 ESP32-CAM 视频监控页面
+feat(sidecar): 新增蘑菇病害3分类 CNN 训练代码
 fix(ui): 修复主题切换时 TabContent 不刷新的问题
 refactor(common): 地图组件抽取 Canvas 回退模式
 ```
@@ -382,5 +493,5 @@ MIT License © 2026 [Wayne-SQS](https://github.com/Wayne-SQS)
 ---
 
 <p align="center">
-  <sub>Built with ❤️ using HarmonyOS ArkTS + ArkUI</sub>
+  <sub>Built with ❤️ using HarmonyOS ArkTS + ArkUI + Python AI</sub>
 </p>

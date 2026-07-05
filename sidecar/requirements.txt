@@ -1,0 +1,13 @@
+﻿# Smart Mushroom - 侧边端 Python 依赖
+# 侧边端需要在鸿蒙端启动前运行，提供 AI 识别服务
+
+torch>=2.0.0
+torchvision>=0.15.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+matplotlib>=3.7.0
+scikit-learn>=1.2.0
+pillow>=9.5.0
+paho-mqtt>=1.6.0
+ipython>=8.0.0
+jupyter>=1.0.0

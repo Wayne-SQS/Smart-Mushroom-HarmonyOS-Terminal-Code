@@ -28,7 +28,7 @@ export const CONTRAST_THEME: ThemeTokens = {
   // 背景
   bgPage: '#F3F3F3',
   bgCard: '#FFFFFF',
-  bgCardLight: '#FAFAFA',
+  bgCardLight: '#E8E8E8',
   bgOverlay: '#73000000',
   bgTabBar: '#FFFFFF',
 
@@ -47,7 +47,7 @@ export const CONTRAST_THEME: ThemeTokens = {
   // 边框 & 分割线
   divider: '#E5E5E5',
   border: '#D5D5D5',
-  borderLight: '#EBEBEB',
+  borderLight: '#D5D5D5',
 
   // 传感器配色
   colorTemp: '#E6391E',
@@ -95,9 +95,9 @@ export const CONTRAST_THEME: ThemeTokens = {
   textOnWarning: '#000000',
 
   // 禁用态（中性灰，与黑白主调一致）
-  disabled: '#E5E5E5',
-  disabledText: '#B0B0B0',
-  disabledBorder: '#D5D5D5',
+  disabled: '#D0D0D0',
+  disabledText: '#888888',
+  disabledBorder: '#C8C8C8',
 
   // 字号
   fontXs: 10,
