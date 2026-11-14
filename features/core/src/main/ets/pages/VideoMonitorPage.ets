@@ -680,9 +680,10 @@ export struct VideoMonitorPage {
                   .fontColor(this.t().textWhiteSub)
                   .margin({ top: 4 })
               } else if (this.errorMsg.length > 0) {
-                Text('⚠')
-                  .fontSize(48)
+                Text('连接失败')
+                  .fontSize(this.t().fontLg)
                   .fontColor(this.t().danger)
+                  .fontWeight(FontWeight.Medium)
                 Text(this.errorMsg)
                   .fontSize(this.t().fontSm)
                   .fontColor(this.t().danger)
@@ -696,9 +697,6 @@ export struct VideoMonitorPage {
                     this.reconnect();
                   })
               } else {
-                Text('📹')
-                  .fontSize(48)
-                  .fontColor(this.t().textWhite)
                 Text('暂无图像')
                   .fontSize(this.t().fontLg)
                   .fontColor(this.t().textWhite)
@@ -728,7 +726,7 @@ export struct VideoMonitorPage {
           }
           .width(36)
           .height(36)
-          .backgroundColor('#99000000')
+          .backgroundColor(this.t().maskOverlay)
           .borderRadius(18)
           .justifyContent(FlexAlign.Center)
           .alignItems(VerticalAlign.Center)
@@ -757,15 +755,13 @@ export struct VideoMonitorPage {
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#000000')
+    .backgroundColor(this.t().surfaceDark)
   }
 
   /** watch 占位提示 */
   @Builder
   WearablePlaceholder() {
     Column({ space: 8 }) {
-      Text('📹')
-        .fontSize(28)
       Text('请在手机端查看监控')
         .fontSize(this.t().fontSm)
         .fontColor(this.t().textSub)
@@ -779,8 +775,9 @@ export struct VideoMonitorPage {
   @Builder
   NoCameraPlaceholder() {
     Column({ space: 12 }) {
-      Text('📹')
-        .fontSize(48)
+      Text('无画面')
+        .fontSize(this.t().fontLg)
+        .fontColor(this.t().textSub)
       Text('该大棚未配置摄像头')
         .fontSize(this.t().fontMd)
         .fontColor(this.t().textTitle)
@@ -834,7 +831,7 @@ export struct VideoMonitorPage {
     .width('100%')
     .height(56)
     .padding({ left: 12, right: 12 })
-    .backgroundColor('#99000000')
+    .backgroundColor(this.t().maskOverlay)
     .alignItems(VerticalAlign.Center)
     .position({ x: 0, y: 0 })
   }
@@ -893,7 +890,7 @@ export struct VideoMonitorPage {
     .width('100%')
     .height(64)
     .padding({ left: 16, right: 16 })
-    .backgroundColor('#99000000')
+    .backgroundColor(this.t().maskOverlay)
     .alignItems(VerticalAlign.Center)
     .position({ x: 0, y: '100%' })
     .translate({ y: '-100%' })
@@ -912,11 +909,11 @@ export struct VideoMonitorPage {
         Blank()
         // 关闭按钮
         Row() {
-          Text('✕')
-            .fontSize(this.t().fontMd)
+          Text('关闭')
+            .fontSize(this.t().fontXs)
             .fontColor(this.t().textWhiteSub)
         }
-        .width(24).height(24)
+        .width(32).height(24)
         .justifyContent(FlexAlign.Center)
         .onClick(() => { this.plantAIResultVisible = false; })
       }
@@ -965,15 +962,15 @@ export struct VideoMonitorPage {
         .margin({ top: 10 })
         .alignItems(HorizontalAlign.Start)
       } else {
-        // 植株状态（标签在上，值在下；错误状态加 ⚠ 图标）
+        // 植株状态（标签在上，值在下；异常状态前置文字标记）
         Column({ space: 2 }) {
           Text('植株状态')
             .fontSize(this.t().fontXs)
             .fontColor(this.t().textWhiteSub)
           Row() {
             if (this.plantStatus.length > 0 && this.isErrorStatus(this.plantStatus)) {
-              Text('⚠')
-                .fontSize(this.t().fontSm)
+              Text('异常')
+                .fontSize(this.t().fontXs)
                 .fontColor(this.t().danger)
                 .margin({ right: 4 })
             }
@@ -1000,7 +997,7 @@ export struct VideoMonitorPage {
               .width('100%')
               .height(4)
               .color(this.getConfidenceColor(parseFloat(this.plantConfidence)))
-              .backgroundColor('#33666666')
+              .backgroundColor(this.t().borderLight)
               .borderRadius(2)
               .margin({ top: 2 })
           }
@@ -1059,7 +1056,7 @@ export struct VideoMonitorPage {
     }
     .width(this.getPanelWidth())
     .padding(14)
-    .backgroundColor('#CC1A1A1A')
+    .backgroundColor(this.t().surfaceDark)
     .borderRadius(this.t().radiusMd)
     .backdropBlur(8)
     // 悬浮在底部控制栏（64vp 高）上方，留 16vp 间距

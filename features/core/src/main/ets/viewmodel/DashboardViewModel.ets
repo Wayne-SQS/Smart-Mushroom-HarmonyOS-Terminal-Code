@@ -20,7 +20,7 @@ interface DashboardOverview {
  * 负责整合传感器数据、快捷控制项、概览统计与告警列表。
  *
  * 数据来源：
- * - 传感器：IoT 设备影子 smartRoom 服务（失败时降级为 mock 数据）
+ * - 传感器：IoT 设备影子 smartRoom 服务（唯一数据源，失败即错误态，不使用假数据）
  * - 控制项：本地状态 → IotService 下发 SetLamp/SetCond/SetVent 命令
  * - 告警：由 AlertViewModel.loadFromSensors 派生
  *
@@ -31,59 +31,75 @@ interface DashboardOverview {
  * - 超出范围 < 10% → status 0（容差）
  * - 超出范围 10%~20% → status 1（警告）
  * - 超出范围 ≥ 20% → status 2（危险）
+ * - 未取到真实值 → status -1（未知），页面显示占位符
  */
 export class DashboardViewModel extends BaseViewModel {
-  /** 传感器数据列表（默认 mock，IoT 可用时覆盖） */
+  /**
+   * 传感器定义（min/max 是业务阈值配置，不是数据）
+   * value/status 初始为「未知」，只有 IoT 真实上报后才置 hasData = true。
+   */
   sensors: SensorDataItem[] = [
-    { type: SensorType.TEMPERATURE, value: 22.5, min: 15, max: 28, status: 0 },
-    { type: SensorType.HUMIDITY, value: 85, min: 70, max: 95, status: 0 },
-    { type: SensorType.CO2, value: 1200, min: 400, max: 1500, status: 1 },
-    { type: SensorType.LIGHT, value: 350, min: 100, max: 800, status: 0 },
-    { type: SensorType.SOIL_MOISTURE, value: 68, min: 50, max: 80, status: 0 },
-    { type: SensorType.SOIL_TEMP, value: 20.3, min: 15, max: 25, status: 0 }
+    { type: SensorType.TEMPERATURE, value: 0, min: 15, max: 28, status: -1, hasData: false },
+    { type: SensorType.HUMIDITY, value: 0, min: 70, max: 95, status: -1, hasData: false },
+    { type: SensorType.CO2, value: 0, min: 400, max: 1500, status: -1, hasData: false },
+    { type: SensorType.LIGHT, value: 0, min: 100, max: 800, status: -1, hasData: false },
+    { type: SensorType.SOIL_MOISTURE, value: 0, min: 50, max: 80, status: -1, hasData: false },
+    { type: SensorType.SOIL_TEMP, value: 0, min: 15, max: 25, status: -1, hasData: false }
   ];
 
   /**
-   * 快捷控制项（与嵌入式端 mqtt.c 支持的 3 个执行器对齐）
+   * 快捷控制项（与嵌入式端 mqtt.c 支持的 4 个执行器对齐）
    *
-   * color 字段为降级占位色；实际渲染时页面通过 ThemeManager 获取主题感知颜色，
-   * 因此 color 仅在页面无法获取主题上下文时作为兜底。
+   * active 只在云端影子返回 LampST/CondST/VentST/BuzzerST 后才可信；
+   * 页面通过 controlsLoaded 区分「未知」与「关闭」。
+   * icon 使用单字几何标签，避免 emoji。
    */
   controls: ControlItem[] = [
-    { id: 'fan', name: '通风', icon: '🌬', active: true, color: '#1890FF' },
-    { id: 'condi', name: '空调', icon: '❄', active: false, color: '#2E7D32' },
-    { id: 'light', name: '补光', icon: '💡', active: false, color: '#E6A23C' },
-    { id: 'buzzer', name: '蜂鸣器', icon: '🔔', active: false, color: '#F56C6C' }
+    { id: 'fan', name: '通风', icon: '风', active: false, color: '' },
+    { id: 'condi', name: '空调', icon: '冷', active: false, color: '' },
+    { id: 'light', name: '补光', icon: '光', active: false, color: '' },
+    { id: 'buzzer', name: '蜂鸣器', icon: '鸣', active: false, color: '' }
   ];
 
-  /** 概览统计 */
+  /** 控制项真实状态是否已从云端取回 */
+  controlsLoaded: boolean = false;
+
+  /** 概览统计（无真实来源的字段一律显示占位符，不编造数值） */
   overview: DashboardOverview = {
-    onlineDevices: 7,
-    todayYield: '12.5kg',
-    currentBatches: 3
+    onlineDevices: 0,
+    todayYield: '--',
+    currentBatches: 0
   };
 
-  /** 告警列表（默认空，由 AlertViewModel 派生；保留字段供 UI 直接绑定） */
+  /** 告警列表（由 AlertViewModel 派生；保留字段供 UI 直接绑定） */
   alerts: AlertItem[] = [];
+
+  /** 正在下发的控制项 ID（'' 表示空闲），用于防重复提交 */
+  pendingControlId: string = '';
 
   /**
    * 加载仪表盘数据
    *
    * 流程：
    * 1. 调用 IoT 查询 smartRoom 服务属性
-   * 2. 服务不存在或加载失败 → 保持 mock 数据
+   * 2. 服务不存在或请求失败 → 抛错，由 handleAsync 写入 errorMsg（页面渲染错误态）
    * 3. 成功则按属性键映射到对应传感器并重算 status
-   * 4. 同步 LampST/CondST 到 controls 状态
+   * 4. 同步 LampST/CondST/VentST/BuzzerST 到 controls 状态
    */
   async loadData(): Promise<void> {
     await this.handleAsync(async () => {
       const props = await IotService.getInstance().getDeviceProperties(SMART_ROOM_SERVICE_ID);
       if (props === null) {
-        Logger.warn(TAG, 'smartRoom 服务不存在，保持 mock 数据');
-        return;
+        throw new Error('未获取到 smartRoom 服务属性，请检查设备是否在线');
       }
       this.applyProperties(props);
       this.syncControlState(props);
+      this.controlsLoaded = true;
+      this.overview = {
+        onlineDevices: 1,
+        todayYield: '--',
+        currentBatches: 0
+      };
     });
   }
 
@@ -91,6 +107,7 @@ export class DashboardViewModel extends BaseViewModel {
    * 切换控制项状态
    *
    * 采用乐观更新策略：先改本地状态，IoT 失败时回滚。
+   * 同一时刻只允许一个控制命令在途，避免重复提交。
    *
    * 控制项 → 命令映射（与嵌入式 mqtt.c handle_cloud_command 对齐）：
    * - fan    → smartRoom/SetVent   (paras={VentStatus:'ON'/'OFF'})
@@ -100,8 +117,14 @@ export class DashboardViewModel extends BaseViewModel {
    *
    * @param controlId 控制项 ID（fan/condi/light/buzzer）
    * @param on 是否开启
+   * @returns 是否下发成功
    */
-  async refreshControl(controlId: string, on: boolean): Promise<void> {
+  async refreshControl(controlId: string, on: boolean): Promise<boolean> {
+    if (this.pendingControlId.length > 0) {
+      Logger.warn(TAG, '上一条控制命令仍在执行，忽略重复提交：' + controlId);
+      return false;
+    }
+    this.pendingControlId = controlId;
     this.setControlActive(controlId, on);
     this.errorMsg = '';
     await this.handleAsync(async () => {
@@ -115,16 +138,18 @@ export class DashboardViewModel extends BaseViewModel {
       } else if (controlId === 'buzzer') {
         await iot.controlBuzzer(on);
       } else {
-        Logger.warn(TAG, '未知控制项：' + controlId);
+        throw new Error('未知控制项：' + controlId);
       }
     });
+    this.pendingControlId = '';
     if (this.errorMsg.length > 0) {
       // 失败回滚
       this.setControlActive(controlId, !on);
       Logger.warn(TAG, '命令下发失败，已回滚：' + this.errorMsg);
-    } else {
-      Logger.info(TAG, '命令下发成功：' + controlId + ' → ' + (on ? 'ON' : 'OFF'));
+      return false;
     }
+    Logger.info(TAG, '命令下发成功：' + controlId + ' → ' + (on ? 'ON' : 'OFF'));
+    return true;
   }
 
   /**
@@ -166,6 +191,11 @@ export class DashboardViewModel extends BaseViewModel {
       if (value !== null) {
         sensor.value = value;
         sensor.status = this.calculateStatus(value, sensor.min, sensor.max);
+        sensor.hasData = true;
+      } else {
+        // 云端未上报 → 明确标记未知，页面显示占位符（不使用兜底数值）
+        sensor.hasData = false;
+        sensor.status = -1;
       }
     }
   }
@@ -180,9 +210,9 @@ export class DashboardViewModel extends BaseViewModel {
    * - Humi  → HUMIDITY       （硬件 DHT11）
    * - Lumi  → LIGHT          （硬件 LDR）
    * - CO2   → CO2            （硬件 CO2 传感器）
-   * - Dist  → SOIL_MOISTURE  （预留，硬件暂未上报，mock 兜底）
+   * - Dist  → SOIL_MOISTURE  （预留；硬件未上报时返回 "-1"，视为无效）
    * - LampST / CondST / VentST 不在此处映射，由 syncControlState() 处理
-   * - SOIL_TEMP / PH：云平台暂未定义对应属性，保留 mock 值
+   * - SOIL_TEMP / PH：云平台未定义对应属性，保持「未知」状态
    * - Smoke：云平台有此属性，当前未分配 SensorType（可后续新增 SMOKE 类型）
    */
   private extractSensorValue(props: Record<string, Object>, type: string): number | null {
@@ -204,12 +234,17 @@ export class DashboardViewModel extends BaseViewModel {
         raw = props['Dist'];
         break;
       case SensorType.SOIL_TEMP:
-        // 云平台未定义土壤温度属性，保持 mock 值
+        // 云平台未定义土壤温度属性
         return null;
       default:
         return null;
     }
-    return this.toNumber(raw);
+    const num = this.toNumber(raw);
+    // Dist 的 -1 是硬件「未接传感器」的约定值，不能当成 0% 展示
+    if (num !== null && num < 0) {
+      return null;
+    }
+    return num;
   }
 
   /**

@@ -400,15 +400,7 @@ ESP32 硬件
 
 ## 📸 截图预览
 
-| 仪表盘 | 设备管理 | 大棚地图 |
-|:---:|:---:|:---:|
-| ![Dashboard](screenshots/dashboard.png) | ![Device](screenshots/device.png) | ![Map](screenshots/map.png) |
-
-| 生长日记 | 告警中心 | 环境配方 |
-|:---:|:---:|:---:|
-| ![Growth](screenshots/growth.png) | ![Alert](screenshots/alert.png) | ![Recipe](screenshots/recipe.png) |
-
-> 📌 截图占位，后续补充实际运行截图。
+截图待补充：仓库当前未附运行截图，界面以 DevEco Studio 真机/模拟器运行结果为准。架构图与流程图见 [`docs/diagrams/`](docs/diagrams/)，完整技术文档见 [`docs/鸿蒙技术开发文档.md`](docs/鸿蒙技术开发文档.md)。
 
 ---
 

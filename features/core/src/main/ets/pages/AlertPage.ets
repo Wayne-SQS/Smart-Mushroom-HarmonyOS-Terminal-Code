@@ -1,10 +1,18 @@
-import { BreakpointConstants, AdaptiveUtils } from 'common-base';
+import { BreakpointConstants, AdaptiveUtils, LayoutConstants, Logger } from 'common-base';
 import { AlertItem } from '../model/GreenhouseModel';
+import { DashboardViewModel } from '../viewmodel/DashboardViewModel';
+import { AlertViewModel } from '../viewmodel/AlertViewModel';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeTokens } from '../theme/ThemeTokens';
+import { StateView } from '../components/StateView';
+import { PageHeader } from '../components/PageHeader';
 
 /**
  * 告警中心页面 - 多端适配（主题驱动）
+ *
+ * 数据真实性：告警不再使用静态示例数组，改为从设备影子实时值派生
+ * （温度/湿度/CO2/光照/土壤湿度超限才会产生告警）。
+ * 请求失败时展示错误态 + 重试，绝不展示编造的告警条目。
  */
 
 interface AlertFilter {
@@ -17,15 +25,18 @@ export struct AlertPage {
   @StorageLink('currentBreakpoint') currentBreakpoint: string = BreakpointConstants.SM;
   @StorageLink('themeName') themeName: string = 'frosted';
 
-  @State alerts: AlertItem[] = [
-    { id: '1', level: 1, message: 'CO₂浓度偏高(1200ppm)，建议通风', time: '2分钟前', device: 'CO2传感器-A区' },
-    { id: '2', level: 0, message: '3号传感器离线', time: '15分钟前', device: '土壤湿度-3号' },
-    { id: '3', level: 0, message: '温度偏低(12°C)', time: '1小时前', device: '温度传感器-B区' },
-    { id: '4', level: 1, message: '湿度超上限(98%)', time: '2小时前', device: '湿度传感器-A区' },
-    { id: '5', level: 0, message: '光照不足(80lux)', time: '3小时前', device: '光照传感器-B区' }
-  ];
-  @State readIds: string[] = ['3'];
+  @State alerts: AlertItem[] = [];
+  @State readIds: string[] = [];
   @State currentFilter: string = 'all';
+  /** 加载态 */
+  @State loading: boolean = true;
+  /** 失败信息（空串表示正常） */
+  @State errorMsg: string = '';
+
+  private dashboardViewModel: DashboardViewModel = new DashboardViewModel();
+  private alertViewModel: AlertViewModel = new AlertViewModel();
+  /** 页面已销毁标记 */
+  private disposed: boolean = false;
 
   private filters: AlertFilter[] = [
     { id: 'all', label: '全部' },
@@ -35,6 +46,43 @@ export struct AlertPage {
 
   t(): ThemeTokens {
     return ThemeManager.getInstance().getTokens();
+  }
+
+  aboutToAppear(): void {
+    this.disposed = false;
+    this.loadAlerts();
+  }
+
+  aboutToDisappear(): void {
+    this.disposed = true;
+  }
+
+  /**
+   * 从设备影子加载真实传感器数据并派生告警
+   */
+  private async loadAlerts(): Promise<void> {
+    this.loading = true;
+    this.errorMsg = '';
+    await this.dashboardViewModel.loadData();
+    if (this.disposed) {
+      return;
+    }
+    this.loading = false;
+    if (this.dashboardViewModel.hasError()) {
+      this.errorMsg = this.dashboardViewModel.errorMsg;
+      Logger.warn('AlertPage', '告警数据加载失败：' + this.errorMsg);
+      return;
+    }
+    this.alertViewModel.loadFromSensors(this.dashboardViewModel.sensors);
+    this.alerts = [...this.alertViewModel.alerts];
+    // 只保留仍存在的告警的已读状态
+    const alive: string[] = [];
+    for (let i = 0; i < this.alerts.length; i++) {
+      if (this.readIds.indexOf(this.alerts[i].id) !== -1) {
+        alive.push(this.alerts[i].id);
+      }
+    }
+    this.readIds = alive;
   }
 
   build() {
@@ -63,10 +111,48 @@ export struct AlertPage {
 
   @Builder
   ContentBody() {
-    this.HeaderSection()
-    this.StatsBar()
-    this.FilterTabs()
-    this.AlertList()
+    PageHeader({
+      title: '告警中心',
+      subtitle: `未读 ${this.getUnreadCount()} · 危险 ${this.getDangerCount()}`,
+      showBack: true,
+      backLabel: '返回',
+      actionLabel: this.getUnreadCount() > 0 ? '全部已读' : '',
+      onBack: () => {
+        this.onBack();
+      },
+      onAction: () => {
+        this.markAllRead();
+      }
+    })
+
+    if (this.loading) {
+      StateView({ mode: 'loading', title: '正在读取告警' })
+    } else if (this.errorMsg.length > 0) {
+      StateView({
+        mode: 'error',
+        title: '告警加载失败',
+        message: this.errorMsg,
+        retryLabel: '重新加载',
+        onRetry: () => {
+          this.loadAlerts();
+        }
+      })
+    } else {
+      this.StatsBar()
+      this.FilterTabs()
+      this.AlertList()
+    }
+  }
+
+  private onBack(): void {
+    try {
+      const stack = AppStorage.get<NavPathStack>('navPathStack');
+      if (stack) {
+        stack.pop();
+      }
+    } catch (err) {
+      Logger.warn('AlertPage', '返回失败');
+    }
   }
 
   private shouldLimitWidth(): boolean {
@@ -91,69 +177,15 @@ export struct AlertPage {
     return Math.floor(12 / cols);
   }
 
-  // ==================== Header ====================
-  @Builder
-  HeaderSection() {
-    Stack({ alignContent: Alignment.TopStart }) {
-      Column()
-        .width('100%')
-        .height(140)
-        .linearGradient({
-          angle: 135,
-          colors: [[this.t().headerGradientTop, 0.0], [this.t().headerGradientBottom, 1.0]]
-        })
-
-      Row() {
-        Column() {
-          Text('告警中心')
-            .fontSize(AdaptiveUtils.getTitleFontSize(this.currentBreakpoint))
-            .fontColor(this.t().textWhite)
-            .fontWeight(FontWeight.Bold)
-          Text(`未读 ${this.getUnreadCount()} · 危险 ${this.getDangerCount()}`)
-            .fontSize(this.t().fontSm)
-            .fontColor(this.t().textWhiteSub)
-            .margin({ top: 4 })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-
-        if (this.getUnreadCount() > 0) {
-          Text(this.getUnreadCount().toString())
-            .fontSize(this.t().fontSm)
-            .fontColor(this.t().textOnDanger)
-            .backgroundColor(this.t().danger)
-            .borderRadius(12)
-            .padding({ left: 8, right: 8, top: 4, bottom: 4 })
-            .margin({ right: 8 })
-            .textAlign(TextAlign.Center)
-            .shadow({ radius: 4, color: this.t().danger, offsetX: 0, offsetY: 0 })
-        }
-
-        Text('全部已读')
-          .fontSize(this.t().fontSm)
-          .fontColor(this.t().textWhite)
-          .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-          .backgroundColor(this.t().bgCardLight)
-          .borderRadius(this.t().radiusSm)
-          .onClick(() => { this.markAllRead(); })
-      }
-      .width('100%')
-      .height(140)
-      .padding({ left: this.getPagePadding(), right: this.getPagePadding() })
-    }
-    .width('100%')
-    .height(140)
-  }
-
   // ==================== 统计条 ====================
   @Builder
   StatsBar() {
     Row() {
-      this.StatMetric('📊', this.alerts.length.toString(), '总告警数', this.t().primary)
+      this.StatMetric(this.alerts.length.toString(), '总告警数', this.t().primary)
       Divider().vertical(true).height(36).color(this.t().borderLight)
-      this.StatMetric('🔴', this.getUnreadCount().toString(), '未读', this.t().danger)
+      this.StatMetric(this.getUnreadCount().toString(), '未读', this.t().danger)
       Divider().vertical(true).height(36).color(this.t().borderLight)
-      this.StatMetric('⚠', this.getDangerCount().toString(), '危险', this.t().warning)
+      this.StatMetric(this.getDangerCount().toString(), '危险', this.t().warning)
     }
     .width('100%')
     .padding({ top: 18, bottom: 18 })
@@ -165,24 +197,22 @@ export struct AlertPage {
       offsetX: 0,
       offsetY: this.t().shadowCardOffsetY
     })
-    .margin({ top: -20, left: this.getPagePadding(), right: this.getPagePadding() })
+    .margin({ top: LayoutConstants.SPACE_MD, left: this.getPagePadding(), right: this.getPagePadding() })
   }
 
   @Builder
-  StatMetric(icon: string, value: string, label: string, accentColor: string) {
+  StatMetric(value: string, label: string, accentColor: string) {
     Column() {
-      Text(icon)
-        .fontSize(18)
-        .width(36)
-        .height(36)
-        .textAlign(TextAlign.Center)
-        .borderRadius(18)
-        .backgroundColor(this.t().bgCardLight)
+      Row()
+        .width(20)
+        .height(3)
+        .borderRadius(2)
+        .backgroundColor(accentColor)
+        .margin({ bottom: LayoutConstants.SPACE_XS })
       Text(value)
         .fontSize(this.t().fontXl)
         .fontColor(this.t().textTitle)
         .fontWeight(FontWeight.Bold)
-        .margin({ top: 6 })
       Text(label)
         .fontSize(this.t().fontSm)
         .fontColor(this.t().textSub)
@@ -208,7 +238,7 @@ export struct AlertPage {
       })
     }
     .width('100%')
-    .padding({ left: this.getPagePadding(), right: this.getPagePadding(), top: 12 })
+    .padding({ left: this.getPagePadding(), right: this.getPagePadding(), top: LayoutConstants.SPACE_MD })
   }
 
   // ==================== 告警列表 ====================
@@ -236,7 +266,7 @@ export struct AlertPage {
       .padding({
         left: this.getPagePadding(),
         right: this.getPagePadding(),
-        top: 12
+        top: LayoutConstants.SPACE_MD
       })
     }
     .layoutWeight(1)
@@ -250,13 +280,13 @@ export struct AlertPage {
         .width(128)
         .height(128)
         .objectFit(ImageFit.Contain)
-      Text('暂无告警，大棚运行正常')
+      Text(this.currentFilter === 'all' ? '当前无告警，环境指标均在阈值内' : '当前筛选条件下暂无告警')
         .fontSize(this.t().fontMd)
         .fontColor(this.t().textSub)
         .margin({ top: 12 })
     }
     .width('100%')
-    .padding({ top: 80, bottom: 80 })
+    .padding({ top: 60, bottom: 60 })
     .alignItems(HorizontalAlign.Center)
   }
 
@@ -308,7 +338,7 @@ export struct AlertPage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
         Row() {
-          Text('📍 ' + item.device)
+          Text(item.device)
             .fontSize(this.t().fontXs)
             .fontColor(this.t().textSub)
             .maxLines(1)

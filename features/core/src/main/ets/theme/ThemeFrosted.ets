@@ -35,6 +35,8 @@ export const FROSTED_THEME: ThemeTokens = {
   bgCardLight: '#E8E8E8', // 浅灰（次级卡片/非选中按钮背景）— 比原来 #F8F9FA 明显加深，确保可见
   bgOverlay: '#E8E8E8',    // 弹窗遮罩
   bgTabBar: '#FFFFFF',     // 底部导航
+  maskOverlay: '#80000000', // 全屏半透明遮罩（浮层）
+  surfaceDark: '#1A1A1A',   // 视频/媒体深色底
 
   // Header 渐变（深棕底，保证白字对比度 ≥ 7:1；棕色集中在此承担蘑菇主题感）
   headerGradientTop: '#5C3A1E',    // 深菌菇棕

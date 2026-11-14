@@ -31,6 +31,8 @@ export const CONTRAST_THEME: ThemeTokens = {
   bgCardLight: '#E8E8E8',
   bgOverlay: '#73000000',
   bgTabBar: '#FFFFFF',
+  maskOverlay: '#99000000',
+  surfaceDark: '#000000',
 
   // Header 渐变（保持纯黑，保证极致对比）
   headerGradientTop: '#000000',

@@ -1,21 +1,19 @@
 /**
- * 登录页面（假登录，纯UI演示）
+ * 登录页面（演示登录，本地放行，不做真实鉴权）
  *
  * 布局策略：
- * 1. 窄屏（XS/SM）：单列垂直居中，Logo → 表单 → 按钮
- * 2. 宽屏（MD/LG/XL）：左右 50-50 分栏
- *    - 左栏：品牌展示区（渐变底 + 装饰像素画 + Slogan）
- *    - 右栏：登录卡片（毛玻璃，水平/垂直居中）
+ * 1. 窄屏（XS/SM）：单列堆叠，品牌 → 表单卡片 → 主按钮
+ * 2. 宽屏（MD/LG/XL）：左右分栏
  *
- * 主题驱动：所有颜色/圆角/字号来自 ThemeTokens，与主界面风格一致。
- * 登录行为：点击按钮后模拟 1.2s 加载，写入 AppStorage.isLoggedIn=true，
- * 由外层 Index 监听变化切换到主界面。
+ * 视觉重点（本轮重排）：
+ * - 突出唯一主操作「登录」，移除第三方登录等无效装饰入口
+ * - 背景只用主题色低饱和渐变，不再写死米色/灰色十六进制
+ * - 401 过期回跳时展示 AppStorage.authExpiredMsg，登录成功后清除
  *
- * 注意：@Builder 方法返回 void，不能链式调用属性修饰符，
- *      需用容器组件（Column/Row）包裹后再设置属性。
+ * 注意：@Builder 方法返回 void，不能链式调用属性修饰符。
  */
 
-import { BreakpointConstants, AdaptiveUtils } from 'common-base';
+import { BreakpointConstants, AdaptiveUtils, LayoutConstants } from 'common-base';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeTokens } from '../theme/ThemeTokens';
 import { promptAction } from '@kit.ArkUI';
@@ -29,9 +27,27 @@ export struct LoginPage {
   @StorageLink('themeName') themeName: string = 'frosted';
   @StorageLink('currentBreakpoint') currentBreakpoint: string = BreakpointConstants.SM;
   @StorageLink('isLoggedIn') @Watch('onLoginStateChanged') isLoggedIn: boolean = false;
+  /** 401 过期提示（由 IotService.handleUnauthorized 写入） */
+  @StorageLink('authExpiredMsg') authExpiredMsg: string = '';
+
+  /** 登录延时定时器句柄，页面销毁时必须清理 */
+  private loginTimer: number = -1;
+  private disposed: boolean = false;
 
   t(): ThemeTokens {
     return ThemeManager.getInstance().getTokens();
+  }
+
+  aboutToAppear(): void {
+    this.disposed = false;
+  }
+
+  aboutToDisappear(): void {
+    this.disposed = true;
+    if (this.loginTimer !== -1) {
+      clearTimeout(this.loginTimer);
+      this.loginTimer = -1;
+    }
   }
 
   private onLoginStateChanged(): void {
@@ -43,19 +59,26 @@ export struct LoginPage {
     return AdaptiveUtils.isLargeScreen(this.currentBreakpoint);
   }
 
-  /** 假登录：不校验账号密码，任意内容均可"登录成功" */
+  /** 演示登录：不校验账号密码，但必须提示这是演示行为 */
   private doLogin(): void {
     if (this.isLogging) {
       return;
     }
     this.isLogging = true;
-    setTimeout(() => {
+    this.loginTimer = setTimeout(() => {
+      this.loginTimer = -1;
+      // 页面已销毁：不再写状态
+      if (this.disposed) {
+        return;
+      }
       this.isLogging = false;
+      this.authExpiredMsg = '';
+      AppStorage.setOrCreate<string>('authExpiredMsg', '');
       this.isLoggedIn = true;
       AppStorage.setOrCreate<boolean>('isLoggedIn', true);
       try {
         promptAction.showToast({
-          message: '登录成功，欢迎回来',
+          message: '已进入演示模式',
           duration: 1500
         });
       } catch (_) {
@@ -119,18 +142,11 @@ export struct LoginPage {
       .height('100%')
       .linearGradient({
         direction: GradientDirection.RightBottom,
-        colors: this.t().name === 'frosted'
-          ? [
-            [this.t().bgPage, 0.0],
-            ['#F6F1E4', 0.4],
-            ['#F2E8D5', 0.8],
-            [this.t().bgPage, 1.0]
-          ]
-          : [
-            ['#F5F5F5', 0.0],
-            ['#ECECEC', 0.5],
-            ['#FAFAFA', 1.0]
-          ]
+        colors: [
+          [this.t().bgPage, 0.0],
+          [this.t().bgCardLight, 0.5],
+          [this.t().bgPage, 1.0]
+        ]
       })
   }
 
@@ -215,12 +231,13 @@ export struct LoginPage {
   @Builder
   SloganItem(title: string, desc: string) {
     Row({ space: 14 }) {
-      Stack({ alignContent: Alignment.Center }) {
-        Circle({ width: 40, height: 40 })
-          .fill(this.t().primaryLight + '88')
-        Circle({ width: 18, height: 18 })
-          .fill(this.t().primary)
-      }
+      // 极简色条替代圆形装饰，降低视觉噪声
+      Column()
+        .width(3)
+        .height(28)
+        .borderRadius(2)
+        .backgroundColor(this.t().primary)
+        .opacity(0.6)
       Column({ space: 3 }) {
         Text(title)
           .fontSize(this.t().fontMd)
@@ -304,6 +321,25 @@ export struct LoginPage {
       .width('100%')
       .alignItems(HorizontalAlign.Start)
 
+      // 401 过期提示：来自 IotService，登录成功后自动清除
+      if (this.authExpiredMsg.length > 0) {
+        Row() {
+          Column()
+            .width(3)
+            .height(16)
+            .borderRadius(2)
+            .backgroundColor(this.t().danger)
+          Text(this.authExpiredMsg)
+            .fontSize(this.t().fontSm)
+            .fontColor(this.t().danger)
+            .margin({ left: LayoutConstants.SPACE_SM })
+        }
+        .width('100%')
+        .padding(LayoutConstants.SPACE_MD)
+        .borderRadius(this.t().radiusSm)
+        .backgroundColor(this.t().bgCardLight)
+      }
+
       Column({ space: 8 }) {
         Text('账号')
           .fontSize(this.t().fontSm)
@@ -372,11 +408,12 @@ export struct LoginPage {
       .width('100%')
       .height(36)
 
-      Button(this.isLogging ? '登录中...' : '登 录')
+      // 唯一主操作：通栏、40 高、高对比，其余装饰入口全部移除
+      Button(this.isLogging ? '正在进入...' : '进入演示')
         .width('100%')
-        .height(48)
+        .height(LayoutConstants.BUTTON_HEIGHT_PRIMARY)
         .fontSize(this.t().fontMd)
-        .fontWeight(FontWeight.Medium)
+        .fontWeight(this.t().fontWeightButton)
         .fontColor(this.t().textOnPrimary)
         .backgroundColor(this.isLogging ? this.t().primaryLight : this.t().primary)
         .borderRadius(this.t().radiusMd)
@@ -388,48 +425,12 @@ export struct LoginPage {
         })
         .onClick(() => { this.doLogin(); })
 
-      Row() {
-        Column()
-          .height(0.5)
-          .layoutWeight(1)
-          .backgroundColor(this.t().divider)
-        Text('或使用其他方式')
-          .fontSize(this.t().fontXs)
-          .fontColor(this.t().textHint)
-          .margin({ left: 14, right: 14 })
-        Column()
-          .height(0.5)
-          .layoutWeight(1)
-          .backgroundColor(this.t().divider)
-      }
-      .width('100%')
-      .margin({ top: 4 })
-
-      Row({ space: 32 }) {
-        this.ThirdLoginIcon('W', this.t().primary, this.t().primaryLight)
-        this.ThirdLoginIcon('Q', this.t().accent, this.t().accentLight)
-        this.ThirdLoginIcon('G', this.t().danger, '#F8D7D7')
-      }
-      .width('100%')
-      .justifyContent(FlexAlign.Center)
-      .margin({ top: 2 })
-
-      Row({ space: 4 }) {
-        Text('还没有账号？')
-          .fontSize(this.t().fontSm)
-          .fontColor(this.t().textSub)
-        Text('立即注册')
-          .fontSize(this.t().fontSm)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(this.t().primary)
-          .onClick(() => {
-            try {
-              promptAction.showToast({ message: '演示版：注册功能暂未开放', duration: 1500 });
-            } catch (_) { /* ignore */ }
-          })
-      }
-      .width('100%')
-      .justifyContent(FlexAlign.Center)
+      // 如实说明当前仍是演示登录，避免误解为真实鉴权
+      Text('演示模式：未接入账号服务，输入任意内容即可进入')
+        .fontSize(this.t().fontXs)
+        .fontColor(this.t().textHint)
+        .width('100%')
+        .textAlign(TextAlign.Center)
     }
     .width('100%')
     .padding(28)
@@ -519,29 +520,6 @@ export struct LoginPage {
     }
   }
 
-  @Builder
-  ThirdLoginIcon(label: string, fg: string, bg: string) {
-    Stack({ alignContent: Alignment.Center }) {
-      Circle({ width: 44, height: 44 })
-        .fill(bg)
-        .opacity(0.5)
-      Circle({ width: 44, height: 44 })
-        .fill(Color.Transparent)
-        .border({ width: 1, color: this.t().borderLight })
-      Text(label)
-        .fontSize(this.t().fontMd)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(fg)
-    }
-    .width(44)
-    .height(44)
-    .onClick(() => {
-      try {
-        promptAction.showToast({ message: `演示版：${label} 登录暂未开放`, duration: 1500 });
-      } catch (_) { /* ignore */ }
-    })
-  }
-
   // ==================== 像素蘑菇 Logo（纯几何绘制，与图标设计呼应） ====================
   @Builder
   PixelMushroomLogo(size: number) {
@@ -553,7 +531,7 @@ export struct LoginPage {
       Column({ space: -Math.round(size * 0.04) }) {
         Column({ space: 0 }) {
           Rect({ width: size * 0.48, height: size * 0.07 })
-            .fill('#F5E0C8')
+            .fill(MUSHROOM_L_SPOT)
             .margin({ left: size * 0.26 })
           Rect({ width: size * 0.72, height: size * 0.1 })
             .fill(MUSHROOM_L_CAP_HL)
@@ -566,14 +544,14 @@ export struct LoginPage {
             .fill(MUSHROOM_L_CAP_D)
           Row({ space: size * 0.08 }) {
             Rect({ width: size * 0.1, height: size * 0.055 })
-              .fill('#FFFBF3')
+              .fill(MUSHROOM_L_SPOT)
               .borderRadius(3)
               .margin({ left: size * 0.04 })
             Rect({ width: size * 0.08, height: size * 0.045 })
-              .fill('#FFFBF3')
+              .fill(MUSHROOM_L_SPOT)
               .borderRadius(2)
             Rect({ width: size * 0.09, height: size * 0.05 })
-              .fill('#FFFBF3')
+              .fill(MUSHROOM_L_SPOT)
               .borderRadius(3)
               .margin({ right: size * 0.04 })
           }
@@ -614,3 +592,5 @@ const MUSHROOM_L_CAP: string = '#B07A3E';
 const MUSHROOM_L_CAP_D: string = '#8B5A2B';
 const MUSHROOM_L_STEM: string = '#F5E6CD';
 const MUSHROOM_L_STEM_S: string = '#DCC8AA';
+/** Logo 高光/斑点（品牌插画固定色，不随主题切换） */
+const MUSHROOM_L_SPOT: string = '#FFFBF3';

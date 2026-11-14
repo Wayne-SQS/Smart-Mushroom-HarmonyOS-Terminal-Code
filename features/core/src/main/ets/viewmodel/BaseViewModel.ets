@@ -5,19 +5,22 @@ const TAG = 'BaseViewModel';
 /**
  * ViewModel 抽象基类
  *
- * 提供通用状态管理（loading / error / timestamp）与异步错误处理能力。
+ * 提供通用状态管理（loading / error / loaded / timestamp）与异步错误处理能力。
  * 所有业务 ViewModel 应继承本类并实现 loadData()。
  *
  * 设计要点：
  * - 纯 TS 类，不使用 ArkTS 装饰器
  * - 所有 async 操作由 handleAsync 统一包装 try-catch
- * - 失败时返回 null，调用方据此降级到 mock 数据
+ * - 失败时写入 errorMsg 并返回 null，调用方必须渲染错误态 + 重试，
+ *   严禁再用 mock 数据冒充真实数据
  */
 export abstract class BaseViewModel {
   /** 是否正在加载 */
   isLoading: boolean = false;
   /** 错误信息（空字符串表示无错误） */
   errorMsg: string = '';
+  /** 是否至少完成过一次加载（用于区分「首屏加载中」与「空数据」） */
+  loaded: boolean = false;
   /** 最后一次成功更新时间（格式：YYYY-MM-DD HH:mm:ss） */
   lastUpdateTime: string = '';
 
@@ -31,6 +34,11 @@ export abstract class BaseViewModel {
     this.errorMsg = msg;
   }
 
+  /** 是否处于错误态 */
+  hasError(): boolean {
+    return this.errorMsg.length > 0;
+  }
+
   /** 更新最后更新时间戳为当前时间 */
   protected updateTimestamp(): void {
     this.lastUpdateTime = this.formatNow();
@@ -38,9 +46,10 @@ export abstract class BaseViewModel {
 
   /**
    * 统一异步操作包装：
-   * - 自动管理 loading 状态
+   * - 自动管理 loading / error 状态
    * - try-catch 捕获异常并写入 errorMsg
-   * - 失败时返回 null，调用方据此降级
+   * - 失败返回 null，调用方必须据此渲染错误态，不得用假数据降级
+   * - 无论成功失败都标记 loaded = true
    *
    * @param fn 异步操作函数
    * @returns 成功返回函数结果，失败返回 null
@@ -64,6 +73,7 @@ export abstract class BaseViewModel {
       return null;
     } finally {
       this.setLoading(false);
+      this.loaded = true;
     }
   }
 

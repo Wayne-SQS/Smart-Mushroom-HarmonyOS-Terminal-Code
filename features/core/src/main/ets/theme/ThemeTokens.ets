@@ -36,6 +36,10 @@ export interface ThemeTokens {
   readonly bgCardLight: string;
   readonly bgOverlay: string;
   readonly bgTabBar: string;
+  /** 全屏遮罩（弹窗/浮层，必须是半透明） */
+  readonly maskOverlay: string;
+  /** 媒体/视频深色底（不参与主题切换的主色） */
+  readonly surfaceDark: string;
 
   // ==================== Header 渐变（深色底，保证白字对比度） ====================
   readonly headerGradientTop: string;
