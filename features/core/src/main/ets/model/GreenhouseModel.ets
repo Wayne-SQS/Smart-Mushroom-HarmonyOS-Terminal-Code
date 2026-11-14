@@ -8,7 +8,10 @@ export interface SensorDataItem {
   value: number;
   min: number;
   max: number;
-  status: number; // 0=正常 1=警告 2=危险
+  /** -1=未知（尚未取到真实值） 0=正常 1=警告 2=危险 */
+  status: number;
+  /** 是否已取到真实上报值；缺省/ false 时页面必须显示占位符，不得展示兜底数值 */
+  hasData?: boolean;
 }
 
 /** 告警信息 */
@@ -46,5 +49,12 @@ export interface ControlItem {
   name: string;
   icon: string;
   active: boolean;
+  /** 主题无关的兜底色（页面实际渲染使用 ThemeTokens） */
   color: string;
+}
+
+/** 控制项真实状态是否已从云端取回 */
+export interface ControlStateSnapshot {
+  readonly loaded: boolean;
+  readonly errorMsg: string;
 }

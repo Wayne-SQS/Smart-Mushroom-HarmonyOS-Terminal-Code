@@ -27,7 +27,7 @@ export default function viewModelTest() {
       });
     });
 
-    describe('DashboardViewModel mock data', () => {
+    describe('DashboardViewModel 初始结构（无 mock 兜底）', () => {
       it('sensors should not be empty after construction', 0, () => {
         const vm: DashboardViewModel = new DashboardViewModel();
         expect(vm.sensors.length > 0).assertTrue();
@@ -60,12 +60,21 @@ export default function viewModelTest() {
         }
       });
 
-      it('each sensor status should be in [0, 2]', 0, () => {
+      it('each sensor status should be in [-1, 2] (-1 = 未知)', 0, () => {
         const vm: DashboardViewModel = new DashboardViewModel();
         for (let i = 0; i < vm.sensors.length; i++) {
           const s: SensorDataItem = vm.sensors[i];
-          expect(s.status >= 0).assertTrue();
+          expect(s.status >= -1).assertTrue();
           expect(s.status <= 2).assertTrue();
+        }
+      });
+
+      it('sensors should start as unknown (no fabricated values)', 0, () => {
+        const vm: DashboardViewModel = new DashboardViewModel();
+        for (let i = 0; i < vm.sensors.length; i++) {
+          const s: SensorDataItem = vm.sensors[i];
+          expect(s.hasData).assertFalse();
+          expect(s.status).assertEqual(-1);
         }
       });
 
@@ -78,19 +87,17 @@ export default function viewModelTest() {
         }
       });
 
-      it('overview onlineDevices should be positive', 0, () => {
+      it('overview should not fabricate numbers before load', 0, () => {
         const vm: DashboardViewModel = new DashboardViewModel();
-        expect(vm.overview.onlineDevices > 0).assertTrue();
+        expect(vm.overview.onlineDevices).assertEqual(0);
+        expect(vm.overview.todayYield).assertEqual('--');
+        expect(vm.overview.currentBatches).assertEqual(0);
       });
 
-      it('overview todayYield should be non-empty string', 0, () => {
+      it('should not report error before first load', 0, () => {
         const vm: DashboardViewModel = new DashboardViewModel();
-        expect(vm.overview.todayYield.length > 0).assertTrue();
-      });
-
-      it('overview currentBatches should be positive', 0, () => {
-        const vm: DashboardViewModel = new DashboardViewModel();
-        expect(vm.overview.currentBatches > 0).assertTrue();
+        expect(vm.hasError()).assertFalse();
+        expect(vm.loaded).assertFalse();
       });
 
       it('controls should have unique ids', 0, () => {
@@ -108,34 +115,36 @@ export default function viewModelTest() {
           const c = vm.controls[i];
           expect(c.name.length > 0).assertTrue();
           expect(c.icon.length > 0).assertTrue();
-          expect(c.color.length > 0).assertTrue();
         }
       });
     });
 
-    describe('DashboardViewModel loadData (IoT unavailable, mock fallback)', () => {
+    describe('DashboardViewModel loadData（IoT 不可用时进入错误态，不降级假数据）', () => {
       it('loadData should set isLoading=false after completion', 0, async () => {
         const vm: DashboardViewModel = new DashboardViewModel();
         await vm.loadData();
         expect(vm.isLoading).assertFalse();
       });
 
-      it('loadData should keep mock sensors non-empty on IoT failure', 0, async () => {
+      it('loadData should mark loaded=true on both success and failure', 0, async () => {
         const vm: DashboardViewModel = new DashboardViewModel();
         await vm.loadData();
-        expect(vm.sensors.length > 0).assertTrue();
+        expect(vm.loaded).assertTrue();
       });
 
-      it('loadData should keep mock controls non-empty on IoT failure', 0, async () => {
+      it('sensors should stay unknown (hasData=false) when IoT unavailable', 0, async () => {
         const vm: DashboardViewModel = new DashboardViewModel();
         await vm.loadData();
-        expect(vm.controls.length > 0).assertTrue();
+        for (let i = 0; i < vm.sensors.length; i++) {
+          expect(vm.sensors[i].hasData).assertFalse();
+        }
       });
 
       it('loadData should set errorMsg when IoT service unavailable', 0, async () => {
         const vm: DashboardViewModel = new DashboardViewModel();
         await vm.loadData();
         expect(vm.errorMsg.length > 0).assertTrue();
+        expect(vm.hasError()).assertTrue();
       });
     });
 

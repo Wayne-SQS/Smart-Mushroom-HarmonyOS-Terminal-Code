@@ -44,11 +44,11 @@ export default function iotTypesTest() {
 
     describe('StyleConstants', () => {
       it('brand colors should exist with correct values', 0, () => {
-        expect(StyleConstants.PRIMARY).assertEqual('#2E7D32');
-        expect(StyleConstants.PRIMARY_LIGHT).assertEqual('#4CAF50');
-        expect(StyleConstants.PRIMARY_DARK).assertEqual('#1B5E20');
-        expect(StyleConstants.ACCENT).assertEqual('#8D6E63');
-        expect(StyleConstants.ACCENT_LIGHT).assertEqual('#BCAAA4');
+        expect(StyleConstants.PRIMARY).assertEqual('#C68642');
+        expect(StyleConstants.PRIMARY_LIGHT).assertEqual('#D4A06A');
+        expect(StyleConstants.PRIMARY_DARK).assertEqual('#8B5A2B');
+        expect(StyleConstants.ACCENT).assertEqual('#7A9E6E');
+        expect(StyleConstants.ACCENT_LIGHT).assertEqual('#C9DBBF');
       });
 
       it('functional colors should exist as non-empty strings', 0, () => {

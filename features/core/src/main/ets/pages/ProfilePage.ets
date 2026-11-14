@@ -1,16 +1,18 @@
-import { BreakpointConstants, AdaptiveUtils } from 'common-base';
+import { BreakpointConstants, AdaptiveUtils, LayoutConstants } from 'common-base';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeTokens } from '../theme/ThemeTokens';
+import { IotService } from '../service/IotService';
+import promptAction from '@ohos.promptAction';
 
 /**
  * 个人中心页面 - 多端适配（主题驱动）
  *
- * 主题切换入口位于"设置"菜单项，点击后弹出主题选择对话框。
+ * 主题切换入口位于「主题风格」卡片，点击后弹出主题选择对话框。
+ * 底部提供退出登录：清理 token 并回落到登录页（401 过期与此同一路径）。
  */
 
 interface MenuItem {
   readonly id: string;
-  icon: string;
   title: string;
   subtitle: string;
 }
@@ -19,27 +21,28 @@ interface MenuItem {
 export struct ProfilePage {
   @StorageLink('currentBreakpoint') currentBreakpoint: string = BreakpointConstants.SM;
   @StorageLink('themeName') themeName: string = 'frosted';
+  @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
 
   @State userName: string = '蘑菇种植员';
   @State userRole: string = '大棚管理员';
-  @State greenhouseCount: number = 4;
   @State showThemeDialog: boolean = false;
   @State selectedTheme: string = 'frosted';
 
+  /** 菜单副标题只描述功能，不再写死「2条告警/3个批次」这类动态数字 */
   private menuGroups: MenuItem[][] = [
     [
-      { id: 'devices', icon: '📱', title: '设备管理', subtitle: '查看所有传感器设备' },
-      { id: 'alerts', icon: '🔔', title: '告警中心', subtitle: '2条待处理告警' },
-      { id: 'growth', icon: '🍄', title: '生长日记', subtitle: '3个在培批次' }
+      { id: 'devices', title: '设备管理', subtitle: '查看所有传感器设备' },
+      { id: 'alerts', title: '告警中心', subtitle: '查看实时告警与处理状态' },
+      { id: 'growth', title: '生长日记', subtitle: '记录批次生长进度' }
     ],
     [
-      { id: 'recipe', icon: '📋', title: '环境配方', subtitle: '平菇/香菇/金针菇' },
-      { id: 'voice', icon: '🎙', title: '语音控制', subtitle: '已关闭' },
-      { id: 'notify', icon: '📨', title: '消息通知', subtitle: '推送设置' }
+      { id: 'recipe', title: '环境配方', subtitle: '平菇/香菇/金针菇' },
+      { id: 'voice', title: '语音控制', subtitle: '当前未开启' },
+      { id: 'notify', title: '消息通知', subtitle: '推送设置' }
     ],
     [
-      { id: 'about', icon: 'ℹ', title: '关于应用', subtitle: 'v1.0.0' },
-      { id: 'settings', icon: '⚙', title: '设置', subtitle: '主题/语言/缓存' }
+      { id: 'about', title: '关于应用', subtitle: 'v1.0.0' },
+      { id: 'settings', title: '设置', subtitle: '主题/语言/缓存' }
     ]
   ];
 
@@ -101,12 +104,50 @@ export struct ProfilePage {
           right: this.getPagePadding(),
           top: 12
         })
+        this.LogoutButton()
         Blank().height(80)
       }
       .width('100%')
     }
     .layoutWeight(1)
     .scrollBar(BarState.Auto)
+  }
+
+  /** 退出登录：清 token + 清登录态，由入口 Index 统一回落到登录页 */
+  @Builder
+  LogoutButton() {
+    Text('退出登录')
+      .width('100%')
+      .height(LayoutConstants.BUTTON_HEIGHT_SECONDARY)
+      .fontSize(this.t().fontMd)
+      .fontColor(this.t().danger)
+      .textAlign(TextAlign.Center)
+      .backgroundColor(this.t().bgCard)
+      .border({ width: LayoutConstants.CARD_BORDER_WIDTH, color: this.t().border })
+      .borderRadius(this.t().radiusMd)
+      .margin({
+        top: LayoutConstants.SPACE_LG,
+        left: this.getPagePadding(),
+        right: this.getPagePadding()
+      })
+      .onClick(() => {
+        this.doLogout();
+      })
+  }
+
+  private doLogout(): void {
+    try {
+      IotService.getInstance().logout();
+    } catch (err) {
+      // token 清理失败不阻断退出流程
+    }
+    this.isLoggedIn = false;
+    AppStorage.setOrCreate<boolean>('isLoggedIn', false);
+    try {
+      promptAction.showToast({ message: '已退出登录', duration: 1500 });
+    } catch (err) {
+      // ignore
+    }
   }
 
   private shouldLimitWidth(): boolean {
@@ -148,13 +189,16 @@ export struct ProfilePage {
 
         Row() {
           Column() {
-            Text('🍄')
-              .fontSize(40)
+            // 单字标识，替代 emoji 头像
+            Text('菌')
+              .fontSize(this.t().fontXl)
+              .fontColor(this.t().primary)
+              .fontWeight(this.t().fontWeightTitle)
           }
           .width(64)
           .height(64)
-          .borderRadius(32)
-          .backgroundColor(this.t().bgCardLight)
+          .borderRadius(this.t().radiusLg)
+          .backgroundColor(this.t().bgCard)
           .justifyContent(FlexAlign.Center)
           .shadow({ radius: 8, color: this.t().shadowFloatColor, offsetX: 0, offsetY: 2 })
 
@@ -171,17 +215,6 @@ export struct ProfilePage {
           .margin({ left: 16 })
           .alignItems(HorizontalAlign.Start)
           .layoutWeight(1)
-
-          Column() {
-            Text(this.greenhouseCount.toString())
-              .fontSize(this.t().fontXxl)
-              .fontColor(this.t().textWhite)
-              .fontWeight(FontWeight.Bold)
-            Text('大棚')
-              .fontSize(this.t().fontXs)
-              .fontColor(this.t().textWhiteSub)
-          }
-          .alignItems(HorizontalAlign.Center)
         }
         .width('100%')
         .padding({ left: this.getPagePadding(), right: this.getPagePadding() })
@@ -196,13 +229,22 @@ export struct ProfilePage {
   @Builder
   ThemeSwitcher() {
     Row() {
-      Text(this.t().name === 'frosted' ? '🌸' : '⚫')
-        .fontSize(24)
-        .width(44)
-        .height(44)
-        .textAlign(TextAlign.Center)
-        .borderRadius(22)
-        .backgroundColor(this.t().bgCardLight)
+      // 双色块展示当前主题色板，替代 emoji 装饰
+      Stack() {
+        Row()
+          .width(22)
+          .height(22)
+          .borderRadius(4)
+          .backgroundColor(this.t().primary)
+        Row()
+          .width(10)
+          .height(10)
+          .borderRadius(2)
+          .backgroundColor(this.t().textOnPrimary)
+          .position({ x: 16, y: 16 })
+      }
+      .width(44)
+      .height(44)
 
       Column() {
         Text('主题风格')
@@ -250,7 +292,7 @@ export struct ProfilePage {
     Column()
       .width('100%')
       .height('100%')
-      .backgroundColor(this.t().bgOverlay)
+      .backgroundColor(this.t().maskOverlay)
       .onClick(() => { this.showThemeDialog = false; })
       .justifyContent(FlexAlign.Center)
 
@@ -262,8 +304,8 @@ export struct ProfilePage {
         .padding({ top: 20, bottom: 16 })
 
       Row() {
-        this.ThemeOption('frosted', '🌸', '雾透玻璃', '浅色淡彩 · 毛玻璃 · 弹性动画')
-        this.ThemeOption('contrast', '⚫', '极致黑白', '纯黑纯白 · 高对比 · 专业克制')
+        this.ThemeOption('frosted', '#C68642', '雾透玻璃', '浅色淡彩 · 毛玻璃 · 弹性动画')
+        this.ThemeOption('contrast', '#1A1A1A', '极致黑白', '纯黑纯白 · 高对比 · 专业克制')
       }
       .width('100%')
       .padding({ left: 20, right: 20 })
@@ -312,21 +354,25 @@ export struct ProfilePage {
   }
 
   @Builder
-  ThemeOption(themeId: string, icon: string, title: string, desc: string) {
+  ThemeOption(themeId: string, swatchColor: string, title: string, desc: string) {
     Column() {
-      Text(icon).fontSize(40)
+      Row()
+        .width(40)
+        .height(40)
+        .borderRadius(8)
+        .backgroundColor(swatchColor)
+        .margin({ bottom: 8 })
       Text(title)
         .fontSize(this.t().fontMd)
         .fontColor(this.t().textTitle)
         .fontWeight(FontWeight.Bold)
-        .margin({ top: 8 })
       Text(desc)
         .fontSize(this.t().fontXs)
         .fontColor(this.t().textSub)
         .margin({ top: 4 })
       if (this.selectedTheme === themeId) {
-        Text('✓')
-          .fontSize(20)
+        Text('已选')
+          .fontSize(this.t().fontXs)
           .fontColor(this.t().primary)
           .margin({ top: 8 })
       }
@@ -370,14 +416,6 @@ export struct ProfilePage {
   @Builder
   MenuItemRow(item: MenuItem, isLast: boolean) {
     Row() {
-      Text(item.icon)
-        .fontSize(20)
-        .width(36)
-        .height(36)
-        .textAlign(TextAlign.Center)
-        .borderRadius(18)
-        .backgroundColor(this.t().bgCardLight)
-
       Column() {
         Text(item.title)
           .fontSize(this.t().fontMd)
@@ -390,7 +428,6 @@ export struct ProfilePage {
       }
       .alignItems(HorizontalAlign.Start)
       .layoutWeight(1)
-      .margin({ left: 12 })
 
       Text('›')
         .fontSize(this.t().fontLg)
@@ -398,7 +435,7 @@ export struct ProfilePage {
     }
     .width('100%')
     .padding({ top: 12, bottom: 12 })
-    .border({ width: { bottom: isLast ? 0 : 0.5 }, color: this.t().borderLight })
+    .border({ width: { bottom: isLast ? 0 : LayoutConstants.HAIRLINE }, color: this.t().borderLight })
     .onClick(() => { this.onMenuClick(item.id); })
   }
 

@@ -1,7 +1,8 @@
-import { BreakpointConstants, AdaptiveUtils, Logger } from 'common-base';
+import { BreakpointConstants, AdaptiveUtils, LayoutConstants, Logger } from 'common-base';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeTokens } from '../theme/ThemeTokens';
 import { IotService } from '../service/IotService';
+import { PageHeader } from '../components/PageHeader';
 import promptAction from '@ohos.promptAction';
 
 const TAG = 'DeviceDetailPage';
@@ -39,20 +40,30 @@ export struct DeviceDetailPage {
   @State condOn: boolean = false;
   @State ventOn: boolean = false;
   @State buzzerOn: boolean = false;
-  /** 控制器状态是否已加载 */
+  /** 控制器状态是否已加载（true 才可信，避免把「未取到」当成「关闭」） */
   @State controllerStatesLoaded: boolean = false;
+  /** 控制器状态加载失败原因 */
+  @State stateError: string = '';
   /** 是否正在下发命令 */
   @State sendingCommand: boolean = false;
+
+  /** 页面已销毁标记：异步回调据此丢弃 setState */
+  private disposed: boolean = false;
 
   t(): ThemeTokens {
     return ThemeManager.getInstance().getTokens();
   }
 
   aboutToAppear(): void {
+    this.disposed = false;
     Logger.info(TAG, '设备详情页打开：' + this.param.name);
     if (this.isController()) {
       this.loadControllerStates();
     }
+  }
+
+  aboutToDisappear(): void {
+    this.disposed = true;
   }
 
   /** 是否为控制器类设备 */
@@ -67,35 +78,53 @@ export struct DeviceDetailPage {
 
   /** 加载控制器当前状态 */
   private async loadControllerStates(): Promise<void> {
+    this.stateError = '';
     try {
       const props = await IotService.getInstance().getSmartRoomProperties();
-      if (props) {
-        this.lampOn = props.LampST === 'ON';
-        this.condOn = props.CondST === 'ON';
-        this.ventOn = props.VentST === 'ON';
-        this.buzzerOn = props.BuzzerST === 'ON';
+      if (this.disposed) {
+        return;
       }
-    } catch (err) {
-      Logger.warn(TAG, '获取控制器状态失败，使用默认关闭状态');
-    } finally {
+      // props 为空表示影子无此服务，不能默认成「全部关闭」
+      if (!props) {
+        this.stateError = '未获取到控制器状态，请检查设备在线情况';
+        return;
+      }
+      this.lampOn = props.LampST === 'ON';
+      this.condOn = props.CondST === 'ON';
+      this.ventOn = props.VentST === 'ON';
+      this.buzzerOn = props.BuzzerST === 'ON';
       this.controllerStatesLoaded = true;
+    } catch (err) {
+      if (this.disposed) {
+        return;
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      this.stateError = msg;
+      this.controllerStatesLoaded = false;
+      Logger.warn(TAG, '获取控制器状态失败：' + msg);
     }
   }
 
-  /** 下发控制命令 */
+  /** 下发控制命令（同一时刻只允许一条，防重复提交） */
   private async toggleControl(
     name: string,
     action: () => Promise<Object>
   ): Promise<void> {
+    if (this.sendingCommand) {
+      return;
+    }
     this.sendingCommand = true;
     try {
       await action();
       promptAction.showToast({ message: `${name} 命令已下发`, duration: 1500 });
     } catch (err) {
-      promptAction.showToast({ message: `${name} 控制失败`, duration: 2000 });
-      Logger.warn(TAG, name + ' 控制失败');
+      const msg = err instanceof Error ? err.message : String(err);
+      promptAction.showToast({ message: `${name} 控制失败：${msg}`, duration: 2000 });
+      Logger.warn(TAG, name + ' 控制失败：' + msg);
     } finally {
-      this.sendingCommand = false;
+      if (!this.disposed) {
+        this.sendingCommand = false;
+      }
     }
   }
 
@@ -125,9 +154,20 @@ export struct DeviceDetailPage {
 
   @Builder
   ContentBody() {
-    this.DetailHeader()
+    PageHeader({
+      title: this.param.name,
+      subtitle: this.getDeviceTypeLabel(),
+      showBack: true,
+      backLabel: '返回',
+      onBack: () => {
+        this.onBack();
+      }
+    })
     Scroll() {
       Column() {
+        if (this.isController() && this.stateError.length > 0) {
+          this.StateErrorBanner()
+        }
         this.BasicInfoCard()
         this.StatusInfoCard()
         if (this.isController()) {
@@ -142,63 +182,49 @@ export struct DeviceDetailPage {
     .scrollBar(BarState.Auto)
   }
 
-  // ==================== 顶部 Header（带返回按钮） ====================
+  /** 控制器状态加载失败：局部错误条 + 重试 */
   @Builder
-  DetailHeader() {
-    Stack({ alignContent: Alignment.TopStart }) {
-      Column()
-        .width('100%')
-        .height(140)
-        .linearGradient({
-          angle: 135,
-          colors: [[this.t().headerGradientTop, 0.0], [this.t().headerGradientBottom, 1.0]]
-        })
-
+  StateErrorBanner() {
+    Row() {
       Column() {
-        Blank().height(40)
-        Row() {
-          // 返回按钮
-          Row() {
-            Text('←')
-              .fontSize(20)
-              .fontColor(this.t().textWhite)
-            Text('返回')
-              .fontSize(this.t().fontSm)
-              .fontColor(this.t().textWhite)
-              .margin({ left: 4 })
-          }
-          .onClick(() => {
-            this.onBack();
-          })
-
-          Blank()
-
-          Column() {
-            Text(this.param.name)
-              .fontSize(AdaptiveUtils.getTitleFontSize(this.currentBreakpoint))
-              .fontColor(this.t().textWhite)
-              .fontWeight(FontWeight.Bold)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-            Text(this.getDeviceTypeLabel())
-              .fontSize(this.t().fontSm)
-              .fontColor(this.t().textWhiteSub)
-              .margin({ top: 4 })
-          }
-          .alignItems(HorizontalAlign.Center)
-          .layoutWeight(1)
-
-          // 右侧占位（与左侧对称）
-          Row().width(60)
-        }
-        .width('100%')
-        .padding({ left: this.getPagePadding(), right: this.getPagePadding() })
+        Text('控制器状态加载失败')
+          .fontSize(this.t().fontSm)
+          .fontColor(this.t().danger)
+          .fontWeight(this.t().fontWeightTitle)
+        Text(this.stateError)
+          .fontSize(this.t().fontXs)
+          .fontColor(this.t().textSub)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .margin({ top: 2 })
       }
-      .width('100%')
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+
+      Text('重试')
+        .fontSize(this.t().fontSm)
+        .fontColor(this.t().primary)
+        .height(LayoutConstants.BUTTON_HEIGHT_SMALL)
+        .padding({ left: LayoutConstants.SPACE_MD, right: LayoutConstants.SPACE_MD })
+        .border({
+          width: LayoutConstants.CARD_BORDER_WIDTH,
+          color: this.t().primary,
+          radius: LayoutConstants.RADIUS_SM
+        })
+        .textAlign(TextAlign.Center)
+        .onClick(() => {
+          this.loadControllerStates();
+        })
     }
     .width('100%')
-    .height(140)
+    .padding(LayoutConstants.SPACE_MD)
+    .backgroundColor(this.t().bgCard)
+    .border({ width: LayoutConstants.CARD_BORDER_WIDTH, color: this.t().border })
+    .borderRadius(this.t().radiusMd)
+    .margin({ top: LayoutConstants.SPACE_MD })
   }
+
+  // ==================== Header 已由 PageHeader 统一提供 ====================
 
   // ==================== 基本信息卡片 ====================
   @Builder
@@ -343,7 +369,7 @@ export struct DeviceDetailPage {
         // 根据设备名称匹配对应的控制项
         if (this.hasControl('补光')) {
           this.ControlSwitch(
-            '💡', '补光灯', this.lampOn,
+            '补', '补光灯', this.lampOn,
             (on: boolean) => {
               this.lampOn = on;
               this.toggleControl('补光灯', () => IotService.getInstance().controlLight(on));
@@ -352,7 +378,7 @@ export struct DeviceDetailPage {
         }
         if (this.hasControl('通风')) {
           this.ControlSwitch(
-            '🌀', '通风扇', this.ventOn,
+            '风', '通风扇', this.ventOn,
             (on: boolean) => {
               this.ventOn = on;
               this.toggleControl('通风扇', () => IotService.getInstance().controlFan(on));
@@ -361,7 +387,7 @@ export struct DeviceDetailPage {
         }
         if (this.hasControl('喷雾')) {
           this.ControlSwitch(
-            '💨', '喷雾/空调', this.condOn,
+            '雾', '喷雾/空调', this.condOn,
             (on: boolean) => {
               this.condOn = on;
               this.toggleControl('喷雾/空调', () => IotService.getInstance().controlCondi(on));
@@ -391,22 +417,36 @@ export struct DeviceDetailPage {
     onToggle: (on: boolean) => void
   ) {
     Row() {
-      Text(icon).fontSize(28)
+      Text(icon)
+        .fontSize(this.t().fontSm)
+        .fontColor(this.t().primary)
+        .width(LayoutConstants.ICON_BOX_SM)
+        .height(LayoutConstants.ICON_BOX_SM)
+        .textAlign(TextAlign.Center)
+        .backgroundColor(this.t().bgCardLight)
+        .borderRadius(this.t().radiusSm)
       Text(label)
         .fontSize(this.t().fontMd)
         .fontColor(this.t().textTitle)
         .fontWeight(FontWeight.Medium)
         .margin({ left: 12 })
       Blank()
-      Toggle({ type: ToggleType.Switch, isOn: isOn })
-        .selectedColor(this.t().primary)
-        .onChange((on: boolean) => {
-          onToggle(on);
-        })
+      if (this.controllerStatesLoaded) {
+        Toggle({ type: ToggleType.Switch, isOn: isOn })
+          .selectedColor(this.t().primary)
+          .onChange((on: boolean) => {
+            onToggle(on);
+          })
+      } else {
+        // 未取到云端状态时不允许操作，也不假装是「关闭」
+        Text('状态未知')
+          .fontSize(this.t().fontXs)
+          .fontColor(this.t().textHint)
+      }
     }
     .width('100%')
-    .height(52)
-    .enabled(!this.sendingCommand)
+    .height(LayoutConstants.ROW_HEIGHT_LIST_ITEM)
+    .enabled(this.controllerStatesLoaded && !this.sendingCommand)
   }
 
   // ==================== 工具方法 ====================

@@ -65,7 +65,8 @@ export class AlertViewModel extends BaseViewModel {
     const newAlerts: AlertItem[] = [];
     for (let i = 0; i < sensors.length; i++) {
       const sensor = sensors[i];
-      if (sensor.status === 0) {
+      // status: -1=未知（未取到真实值）、0=正常，均不生成告警
+      if (sensor.status <= 0) {
         continue;
       }
       const info = this.buildAlertInfo(sensor);
@@ -147,9 +148,10 @@ export class AlertViewModel extends BaseViewModel {
    * 使用 switch 显式分支按 type 构造消息，避免动态属性访问。
    */
   private buildAlertInfo(sensor: SensorDataItem): AlertInfo | null {
-    const value = sensor.value;
-    const isHigh = value > sensor.max;
-    const isLow = value < sensor.min;
+    // 统一保留 1 位小数，避免 "22.500000001°C" 这类噪声直接展示
+    const value = Number.isFinite(sensor.value) ? sensor.value.toFixed(1) : '--';
+    const isHigh = value !== '--' && sensor.value > sensor.max;
+    const isLow = value !== '--' && sensor.value < sensor.min;
     const action = this.inferAction(sensor.type, isHigh, isLow);
     switch (sensor.type) {
       case SensorType.TEMPERATURE:

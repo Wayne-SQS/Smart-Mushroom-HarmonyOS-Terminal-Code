@@ -1,9 +1,10 @@
-import { SensorType, SensorConfigUtil, BreakpointConstants, AdaptiveUtils, Logger, BarChartComponent, ChartPoint } from 'common-base';
+import { SensorType, SensorConfigUtil, BreakpointConstants, AdaptiveUtils, Logger } from 'common-base';
 import { SensorDataItem, AlertItem, ControlItem } from '../model/GreenhouseModel';
 import { DashboardViewModel } from '../viewmodel/DashboardViewModel';
 import { AlertViewModel } from '../viewmodel/AlertViewModel';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeTokens } from '../theme/ThemeTokens';
+import { StateView } from '../components/StateView';
 import promptAction from '@ohos.promptAction';
 
 const TAG = 'DashboardPage';
@@ -23,24 +24,24 @@ export struct DashboardPage {
   @StorageLink('themeName') @Watch('onThemeChange') themeName: string = 'frosted';
 
   @State greenhouseName: string = '1号蘑菇大棚';
-  @State greenhouseStatus: string = '运行正常';
-  @State weather: string = '多云 18°C';
+  @State greenhouseStatus: string = '状态未知';
+  /** 天气接口未接入，如实展示占位文案，不编造温度 */
+  @State weather: string = '天气未接入';
   @State activeAlerts: number = 0;
 
-  // 传感器 / 控制 / 告警：初始为空，aboutToAppear 同步 mock
+  // 传感器 / 控制 / 告警：初值均为「未知」，只有 IoT 真实数据回填后才可信
   @State sensors: SensorDataItem[] = [];
   @State controls: ControlItem[] = [];
   @State alerts: AlertItem[] = [];
+
+  // 三态：加载中 / 失败（errorMsg 非空）/ 正常
+  @State loading: boolean = true;
+  @State errorMsg: string = '';
 
   // 概览统计：由 viewModel.overview 同步
   @State overviewOnline: number = 0;
   @State overviewYield: string = '--';
   @State overviewBatches: number = 0;
-
-  // 24h 趋势数据（mock 演示，可后续接入历史接口）
-  @State trendData: ChartPoint[] = [];
-  // 趋势图是否放大悬浮
-  @State trendExpanded: boolean = false;
 
   // 脉冲动画状态
   @State pulseScale: number = 1;
@@ -60,6 +61,8 @@ export struct DashboardPage {
 
   private viewModel: DashboardViewModel = new DashboardViewModel();
   private alertViewModel: AlertViewModel = new AlertViewModel();
+  /** 页面是否已销毁：异步回调据此丢弃 setState，避免 aboutToDisappear 后写状态 */
+  private disposed: boolean = false;
 
   /** 一行获取所有 token */
   t(): ThemeTokens {
@@ -67,13 +70,13 @@ export struct DashboardPage {
   }
 
   aboutToAppear(): void {
-    // 1. 同步 mock 数据，避免首帧空白
+    this.disposed = false;
+    // 1. 先用「未知」骨架渲染，不填充任何示例数值
     this.sensors = [...this.viewModel.sensors];
     this.controls = [...this.viewModel.controls];
     this.syncOverview();
     this.syncAlerts();
-    this.buildTrendData();
-    // 2. 异步加载云端属性
+    // 2. 异步加载云端属性（失败会进入错误态，不降级为假数据）
     this.loadFromViewModel();
     // 3. 入场动画（黑白主题直接显示全部卡片）
     this.applyEntranceForCurrentTheme();
@@ -112,11 +115,12 @@ export struct DashboardPage {
   }
 
   aboutToDisappear(): void {
+    this.disposed = true;
     this.stopStaggerEntrance();
     this.stopBreathingGlow();
   }
 
-  /** 卡片 stagger 渐入：6 张传感器 + 1 概览 + 1 趋势 + 1 控制 + 1 告警 = 10 层 */
+  /** 卡片 stagger 渐入：概览 + 传感器 + 控制 + 告警 共 10 层 */
   private startStaggerEntrance(): void {
     const count = 10;
     for (let i = 0; i < count; i++) {
@@ -163,16 +167,33 @@ export struct DashboardPage {
   }
 
   private async loadFromViewModel(): Promise<void> {
-    try {
-      await this.viewModel.loadData();
-      this.sensors = [...this.viewModel.sensors];
-      this.controls = [...this.viewModel.controls];
-      this.syncOverview();
-      this.syncAlerts();
-      Logger.info(TAG, '仪表盘数据加载完成');
-    } catch (err) {
-      Logger.warn(TAG, '数据加载失败，使用 mock 数据');
+    this.loading = true;
+    this.errorMsg = '';
+    await this.viewModel.loadData();
+    // 页面已销毁：丢弃回调，避免对不可见页面写状态
+    if (this.disposed) {
+      return;
     }
+    this.loading = false;
+    if (this.viewModel.hasError()) {
+      // 失败必须显式暴露，不再用 mock 数据填充
+      this.errorMsg = this.viewModel.errorMsg;
+      this.greenhouseStatus = '设备状态未知';
+      Logger.warn(TAG, '仪表盘加载失败：' + this.errorMsg);
+      return;
+    }
+    this.sensors = [...this.viewModel.sensors];
+    this.controls = [...this.viewModel.controls];
+    this.syncOverview();
+    this.syncAlerts();
+    this.greenhouseStatus = this.overviewOnline > 0 ? '设备在线' : '设备离线';
+    this.checkBreathingGlow();
+    Logger.info(TAG, '仪表盘数据加载完成');
+  }
+
+  /** 用户点击「重试」 */
+  private retryLoad(): void {
+    this.loadFromViewModel();
   }
 
   private syncOverview(): void {
@@ -188,18 +209,11 @@ export struct DashboardPage {
     this.activeAlerts = this.alerts.length;
   }
 
-  /** 构造 24h 趋势 mock 数据（取当前温度上下浮动） */
-  private buildTrendData(): void {
-    const baseTemp = this.sensors.length > 0 ? this.sensors[0].value : 22;
-    const points: ChartPoint[] = [];
-    for (let i = 0; i < 12; i++) {
-      const variation = Math.sin(i * 0.6) * 3 + (i % 3) - 1;
-      points.push({ label: (i * 2) + 'h', value: Math.round((baseTemp + variation) * 10) / 10 });
-    }
-    this.trendData = points;
-  }
-
   private async onControlToggle(item: ControlItem): Promise<void> {
+    // 有命令在途时忽略重复点击，防止连点导致状态错乱
+    if (this.viewModel.pendingControlId.length > 0) {
+      return;
+    }
     const newActive: boolean = !item.active;
     // 乐观更新 UI
     const updated: ControlItem[] = this.controls.map((c: ControlItem) => {
@@ -217,15 +231,18 @@ export struct DashboardPage {
     });
 
     // 调用 ViewModel 下发命令
-    await this.viewModel.refreshControl(item.id, newActive);
+    const ok: boolean = await this.viewModel.refreshControl(item.id, newActive);
+    if (this.disposed) {
+      return;
+    }
 
     // 同步结果（成功保持 / 失败回滚）
     this.controls = [...this.viewModel.controls];
 
-    if (this.viewModel.errorMsg.length > 0) {
+    if (!ok && this.viewModel.errorMsg.length > 0) {
       promptAction.showToast({
-        message: `${item.name}${newActive ? '开启' : '关闭'}失败`,
-        duration: 2000
+        message: `${item.name}${newActive ? '开启' : '关闭'}失败：${this.viewModel.errorMsg}`,
+        duration: 2500
       });
       Logger.warn(TAG, '控制下发失败：' + this.viewModel.errorMsg);
     } else {
@@ -294,11 +311,27 @@ export struct DashboardPage {
     this.HeaderSection()
     Scroll() {
       Column() {
-        this.OverviewCard()
-        this.SensorGrid()
-        this.TrendSection()
-        this.QuickControlSection()
-        this.AlertSection()
+        if (this.loading) {
+          // 首屏加载态：明确告知正在读取，不展示任何占位数值
+          StateView({ mode: 'loading', title: '正在读取设备数据', message: '等待设备影子上报' })
+        } else if (this.errorMsg.length > 0) {
+          // 失败态：显示真实原因 + 重试，不使用假数据兜底
+          StateView({
+            mode: 'error',
+            title: '设备数据加载失败',
+            message: this.errorMsg,
+            retryLabel: '重新加载',
+            onRetry: () => {
+              this.retryLoad();
+            }
+          })
+        } else {
+          this.OverviewCard()
+          this.SensorGrid()
+          this.TrendSection()
+          this.QuickControlSection()
+          this.AlertSection()
+        }
         Blank().height(80)
       }
       .width('100%')
@@ -307,11 +340,6 @@ export struct DashboardPage {
     .layoutWeight(1)
     .scrollBar(BarState.Auto)
     .backgroundColor(this.t().bgPage)
-
-    // 趋势图悬浮放大浮层
-    if (this.trendExpanded) {
-      this.TrendExpandedOverlay()
-    }
   }
 
   private getPagePadding(): number {
@@ -335,13 +363,35 @@ export struct DashboardPage {
     return Math.floor(12 / cols);
   }
 
-  /** 状态色：0=正常 1=警告 2=危险 */
+  /** 统计尚未上报的传感器数量（用于告警完整性说明） */
+  private getMissingSensorCount(): number {
+    let count = 0;
+    for (let i = 0; i < this.sensors.length; i++) {
+      if (!this.sensors[i].hasData) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /** 状态点颜色：在线绿 / 离线红 / 未知灰（不假装在线） */
+  private getStatusDotColor(): string {
+    if (this.greenhouseStatus === '设备在线') {
+      return this.t().success;
+    }
+    if (this.greenhouseStatus === '设备离线') {
+      return this.t().danger;
+    }
+    return this.t().textWhiteSub;
+  }
+
+  /** 状态色：-1=未知 0=正常 1=警告 2=危险 */
   private getStatusColor(status: number): string {
     switch (status) {
       case 0: return this.t().success;
       case 1: return this.t().warning;
       case 2: return this.t().danger;
-      default: return this.t().success;
+      default: return this.t().border;
     }
   }
 
@@ -416,8 +466,8 @@ export struct DashboardPage {
               .fontWeight(FontWeight.Bold)
             Row() {
               Circle({ width: 8, height: 8 })
-                .fill(this.t().success)
-                .shadow({ radius: 4, color: this.t().success, offsetX: 0, offsetY: 0 })
+                .fill(this.getStatusDotColor())
+                .shadow({ radius: 4, color: this.getStatusDotColor(), offsetX: 0, offsetY: 0 })
               Text(this.greenhouseStatus)
                 .fontSize(this.t().fontSm)
                 .fontColor(this.t().textWhiteSub)
@@ -430,26 +480,27 @@ export struct DashboardPage {
           Blank()
 
           Column() {
-            Text('☁').fontSize(28)
+            Text('天气').fontSize(this.t().fontSm).fontColor(this.t().textWhiteSub)
             Text(this.weather)
               .fontSize(this.t().fontSm)
               .fontColor(this.t().textWhiteSub)
               .margin({ top: 2 })
           }
-          .alignItems(HorizontalAlign.Center)
+          .alignItems(HorizontalAlign.End)
         }
         .width('100%')
         .padding({ left: 20, right: 20 })
 
         if (this.activeAlerts > 0) {
           Row() {
-            Text('⚠').fontSize(this.t().fontSm).fontColor(this.t().warning)
+            Circle({ width: 6, height: 6 })
+              .fill(this.t().warning)
             Text(`${this.activeAlerts}条待处理告警`)
               .fontSize(this.t().fontSm)
               .fontColor(this.t().textTitle)
               .margin({ left: 6 })
             Blank()
-            Text('查看 >')
+            Text('查看')
               .fontSize(this.t().fontSm)
               .fontColor(this.t().textSub)
           }
@@ -574,25 +625,29 @@ export struct DashboardPage {
       }
 
       Column() {
-        // 图标 + 状态点
+        // 名称 + 状态点（不使用 emoji 图标）
         Row() {
-          Text(SensorConfigUtil.getConfig(item.type as SensorType).icon).fontSize(this.t().fontSm)
           Text(SensorConfigUtil.getConfig(item.type as SensorType).name)
             .fontSize(this.t().fontXs)
             .fontColor(this.t().textSub)
-            .margin({ left: 6 })
             .maxLines(1)
           Blank()
+          if (!item.hasData) {
+            Text('未上报')
+              .fontSize(this.t().fontXs)
+              .fontColor(this.t().textHint)
+              .margin({ right: 4 })
+          }
           Circle({ width: 5, height: 5 })
             .fill(this.getStatusColor(item.status))
         }
         .width('100%')
 
-        // 数值 + 单位（大字号走 AdaptiveUtils 断点自适应；数值用等宽字体对齐不跳动）
+        // 数值 + 单位（无真实上报时显示 '--'，严禁展示兜底数值）
         Row() {
-          Text(item.value.toFixed(1))
+          Text(item.hasData ? item.value.toFixed(1) : '--')
             .fontSize(AdaptiveUtils.getSensorDataFontSize(this.currentBreakpoint))
-            .fontColor(this.t().textTitle)
+            .fontColor(item.hasData ? this.t().textTitle : this.t().textHint)
             .fontFamily(this.t().fontMonoFamily)
             .fontWeight(this.t().fontWeightMono)
           Text(SensorConfigUtil.getConfig(item.type as SensorType).unit)
@@ -639,7 +694,7 @@ export struct DashboardPage {
     .onClick(() => this.triggerPulse(item.type))
   }
 
-  // ==================== 趋势图（毛玻璃卡片） ====================
+  // ==================== 24 小时趋势（历史接口未接入，显式空态） ====================
   @Builder
   TrendSection() {
     Column() {
@@ -649,31 +704,20 @@ export struct DashboardPage {
           .fontColor(this.t().textTitle)
           .fontWeight(FontWeight.Bold)
         Blank()
-        Text('点击放大 ↖')
+        Text('温度')
           .fontSize(this.t().fontXs)
           .fontColor(this.t().textHint)
       }
       .width('100%')
       .margin({ bottom: 10 })
 
-      if (this.trendData.length > 0) {
-        BarChartComponent({
-          data: this.trendData,
-          barColor: this.t().animationEnabled ? this.t().primaryLight : this.t().primary,
-          labelColor: this.t().textTitle,
-          axisColor: this.t().textSub,
-          baselineColor: this.t().divider,
-          chartHeight: 200,
-          labelFontSize: 22,
-          axisFontSize: 16
-        })
-      } else {
-        Column()
-          .width('100%')
-          .height(160)
-          .backgroundColor(this.t().bgCardLight)
-          .borderRadius(this.t().radiusSm)
-      }
+      // 没有历史数据接口，不伪造曲线，直接展示空态
+      StateView({
+        mode: 'empty',
+        title: '暂无历史数据',
+        message: '历史数据接口尚未接入，当前仅展示设备实时上报值',
+        verticalPadding: 24
+      })
     }
     .width('100%')
     .padding(14)
@@ -691,72 +735,6 @@ export struct DashboardPage {
     .opacity(this.getEntranceOpacity(6))
     .translate({ y: this.getEntranceTranslateY(6) })
     .animation({ duration: this.t().animationDuration, curve: Curve.EaseOut })
-    .onClick(() => {
-      this.trendExpanded = true;
-    })
-  }
-
-  // ==================== 趋势图悬浮放大浮层 ====================
-  @Builder
-  TrendExpandedOverlay() {
-    Stack() {
-      // 半透明遮罩
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor('#80000000')
-        .onClick(() => {
-          this.trendExpanded = false;
-        })
-
-      // 放大卡片
-      Column() {
-        Row() {
-          Text('24小时温度趋势')
-            .fontSize(this.t().fontXl)
-            .fontColor(this.t().textTitle)
-            .fontWeight(FontWeight.Bold)
-          Blank()
-          Text('✕')
-            .fontSize(18)
-            .fontColor(this.t().textSub)
-            .width(28)
-            .height(28)
-            .textAlign(TextAlign.Center)
-          .onClick(() => {
-            this.trendExpanded = false;
-          })
-        }
-        .width('100%')
-        .margin({ bottom: 16 })
-
-        if (this.trendData.length > 0) {
-          BarChartComponent({
-            data: this.trendData,
-            barColor: this.t().animationEnabled ? this.t().primaryLight : this.t().primary,
-            labelColor: this.t().textTitle,
-            axisColor: this.t().textSub,
-            baselineColor: this.t().divider,
-            chartHeight: 340,
-            labelFontSize: 30,
-            axisFontSize: 22
-          })
-        }
-      }
-      .width('92%')
-      .padding(20)
-      .backgroundColor(this.t().bgCard)
-      .borderRadius(this.t().radiusLg)
-      .shadow({
-        radius: this.t().shadowCardRadius * 2,
-        color: this.t().shadowCardColor,
-        offsetX: 0,
-        offsetY: 4
-      })
-    }
-    .width('100%')
-    .height('100%')
-    .position({ x: 0, y: 0 })
   }
 
   // ==================== 快捷控制（脉冲动画） ====================
@@ -768,6 +746,12 @@ export struct DashboardPage {
           .fontSize(this.t().fontLg)
           .fontColor(this.t().textTitle)
           .fontWeight(FontWeight.Bold)
+        Blank()
+        if (!this.viewModel.controlsLoaded) {
+          Text('控制状态未知')
+            .fontSize(this.t().fontXs)
+            .fontColor(this.t().textHint)
+        }
       }
       .margin({ bottom: 10 })
 
@@ -775,7 +759,9 @@ export struct DashboardPage {
         ForEach(this.controls, (item: ControlItem) => {
           Column() {
             Stack() {
-              Text(item.icon).fontSize(28)
+              Text(item.icon)
+                .fontSize(this.t().fontLg)
+                .fontColor(item.active ? this.getControlAccentColor(item.id) : this.t().textSub)
               if (item.active) {
                 Circle({ width: 10, height: 10 })
                   .fill(this.t().success)
@@ -794,8 +780,9 @@ export struct DashboardPage {
               ? { x: this.pulseScale, y: this.pulseScale }
               : { x: 1, y: 1 })
             .animation({ duration: this.t().animationDuration, curve: Curve.EaseOut })
+            .opacity(this.viewModel.pendingControlId === item.id ? 0.5 : 1)
 
-            Text(item.name)
+            Text(this.viewModel.pendingControlId === item.id ? '下发中' : item.name)
               .fontSize(this.t().fontSm)
               .fontColor(item.active ? this.getControlAccentColor(item.id) : this.t().textSub)
               .margin({ top: 6 })
@@ -847,11 +834,17 @@ export struct DashboardPage {
 
       if (this.alerts.length === 0) {
         Row() {
-          Text('✓').fontSize(this.t().fontMd).fontColor(this.t().success)
-          Text('所有传感器正常')
+          Circle({ width: 6, height: 6 })
+            .fill(this.getMissingSensorCount() > 0 ? this.t().border : this.t().success)
+          Text(this.getMissingSensorCount() > 0
+            ? `${this.getMissingSensorCount()} 项传感器未上报，告警判断可能不完整`
+            : '所有传感器正常')
             .fontSize(this.t().fontSm)
             .fontColor(this.t().textSub)
             .margin({ left: 8 })
+            .layoutWeight(1)
+            .maxLines(2)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         .width('100%')
         .height(48)

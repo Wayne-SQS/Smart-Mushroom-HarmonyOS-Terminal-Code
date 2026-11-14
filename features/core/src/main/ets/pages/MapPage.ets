@@ -61,7 +61,13 @@ export struct MapPage {
   @StorageLink('themeName') themeName: string = 'frosted';
   @StorageLink('currentBreakpoint') currentBreakpoint: string = BreakpointConstants.SM;
 
-  /** 大棚位置数据（武汉周边真实经纬度） */
+  /**
+   * 大棚位置数据
+   *
+   * 注意：云端暂无「多棚列表」接口，除 1 号棚外其余条目为界面演示数据。
+   * 页面在列表标题处标注「演示点位」，不把演示数据当成实时生产数据。
+   */
+  @State isDemoData: boolean = true;
   @State greenhouses: GreenhouseLocation[] = [
     { id: '1', name: '1号蘑菇大棚', status: '运行正常', sensors: 12, alerts: 0, devices: 8, temp: 22.5, humidity: 85, lat: 30.52, lng: 114.32 },
     { id: '2', name: '2号蘑菇大棚', status: '运行正常', sensors: 10, alerts: 0, devices: 6, temp: 21.8, humidity: 82, lat: 30.55, lng: 114.28 },
@@ -807,7 +813,7 @@ export struct MapPage {
       Row() {
         Text('大棚列表').fontSize(this.t().fontMd).fontColor(this.t().textTitle).fontWeight(FontWeight.Bold)
         Blank()
-        Text(`${this.getFilteredGreenhouses().length} / ${this.greenhouses.length}`)
+        Text(`${this.getFilteredGreenhouses().length} / ${this.greenhouses.length}${this.isDemoData ? ' · 演示点位' : ''}`)
           .fontSize(this.t().fontSm)
           .fontColor(this.t().textSub)
       }
@@ -904,7 +910,7 @@ export struct MapPage {
     Column()
       .width('100%')
       .height('100%')
-      .backgroundColor('#80000000')
+      .backgroundColor(this.t().maskOverlay)
       .onClick(() => {
         this.closeSheet();
       })
@@ -1231,11 +1237,11 @@ export struct MapPage {
       return `检测中...`;
     }
     if (!this.isIotOnline) {
-      return `🔴 IoT 离线 · 无真实数据`;
+      return `IoT 离线 · 无真实数据`;
     }
     const online: number = this.getOnlineCount();
     const alerts: number = this.getAlertGreenhouses();
-    return `🟢 IoT 在线 · ${online}台 · ${alerts} 告警`;
+    return `IoT 在线 · ${online}台 · ${alerts} 告警`;
   }
 }
 

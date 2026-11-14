@@ -1,59 +1,64 @@
 /**
- * 应用样式常量
+ * 应用样式常量（全局唯一视觉基线）
  *
- * 视觉风格：自然生态 + 科技感
- * 主色调：森林绿 + 蘑菇暖棕 + 数据蓝
+ * 视觉风格：低饱和、简洁、高对比。
+ * 配色与 features/core/theme 的 ThemeTokens 保持同一套色板：
+ * 菌菇棕作主色，中性灰作背景，传感器色仅用于装饰。
+ *
+ * 说明：颜色/圆角/字号优先从 ThemeTokens 取（支持双主题），
+ * 本文件的 Layout 常量用于「与主题无关的尺寸规则」——
+ * 间距 4/8/12/16/24/32、圆角 8/12/16、按钮 40/36、标题栏 56。
  */
 
 export class StyleConstants {
-  // ==================== 品牌色 ====================
-  static readonly PRIMARY: string = '#2E7D32';
-  static readonly PRIMARY_LIGHT: string = '#4CAF50';
-  static readonly PRIMARY_DARK: string = '#1B5E20';
-  static readonly ACCENT: string = '#8D6E63';
-  static readonly ACCENT_LIGHT: string = '#BCAAA4';
+  // ==================== 品牌色（与 FROSTED_THEME 对齐） ====================
+  static readonly PRIMARY: string = '#C68642';
+  static readonly PRIMARY_LIGHT: string = '#D4A06A';
+  static readonly PRIMARY_DARK: string = '#8B5A2B';
+  static readonly ACCENT: string = '#7A9E6E';
+  static readonly ACCENT_LIGHT: string = '#C9DBBF';
 
   // ==================== 功能色 ====================
-  static readonly SUCCESS: string = '#52C41A';
-  static readonly WARNING: string = '#FAAD14';
-  static readonly DANGER: string = '#FF4D4F';
-  static readonly INFO: string = '#1890FF';
-  static readonly PURPLE: string = '#722ED1';
+  static readonly SUCCESS: string = '#7A9E6E';
+  static readonly WARNING: string = '#E6A23C';
+  static readonly DANGER: string = '#E06C75';
+  static readonly INFO: string = '#6B8E9E';
+  static readonly PURPLE: string = '#A88BA8';
 
   // ==================== 背景色 ====================
-  static readonly BG_PAGE: string = '#F0F4F0';
+  static readonly BG_PAGE: string = '#F5F6F7';
   static readonly BG_CARD: string = '#FFFFFF';
-  static readonly BG_CARD_LIGHT: string = '#F5F9F5';
-  static readonly BG_DARK_CARD: string = '#1A2E1A';
+  static readonly BG_CARD_LIGHT: string = '#E8E8E8';
+  static readonly BG_DARK_CARD: string = '#1A1A1A';
 
   // ==================== 文字色 ====================
-  static readonly TEXT_TITLE: string = '#1A1A1A';
-  static readonly TEXT_BODY: string = '#333333';
-  static readonly TEXT_SUB: string = '#666666';
-  static readonly TEXT_HINT: string = '#999999';
+  static readonly TEXT_TITLE: string = '#2A2A2A';
+  static readonly TEXT_BODY: string = '#3A3A3A';
+  static readonly TEXT_SUB: string = '#6A6A6A';
+  static readonly TEXT_HINT: string = '#9A9A9A';
   static readonly TEXT_WHITE: string = '#FFFFFF';
-  static readonly TEXT_WHITE_SUB: string = '#FFFFFFCC';
+  static readonly TEXT_WHITE_SUB: string = '#F0F0F0';
 
   // ==================== 分割线/边框 ====================
   static readonly DIVIDER: string = '#E8E8E8';
-  static readonly BORDER: string = '#E0E0E0';
-  static readonly BORDER_LIGHT: string = '#F0F0F0';
+  static readonly BORDER: string = '#DDDDDD';
+  static readonly BORDER_LIGHT: string = '#DCDCDC';
 
-  // ==================== 传感器配色 ====================
-  static readonly COLOR_TEMP: string = '#FF7043';
-  static readonly COLOR_HUMIDITY: string = '#42A5F5';
-  static readonly COLOR_CO2: string = '#7E57C2';
-  static readonly COLOR_LIGHT: string = '#FFA726';
-  static readonly COLOR_SOIL: string = '#43A047';
-  static readonly COLOR_PH: string = '#AB47BC';
+  // ==================== 传感器配色（仅装饰） ====================
+  static readonly COLOR_TEMP: string = '#E8A87C';
+  static readonly COLOR_HUMIDITY: string = '#7EB5D6';
+  static readonly COLOR_CO2: string = '#A88BA8';
+  static readonly COLOR_LIGHT: string = '#F0D585';
+  static readonly COLOR_SOIL: string = '#7A9E6E';
+  static readonly COLOR_PH: string = '#D88AA0';
 
-  // ==================== 圆角 vp ====================
+  // ==================== 圆角 vp（8 / 12 / 16） ====================
   static readonly RADIUS_SM: number = 8;
   static readonly RADIUS_MD: number = 12;
   static readonly RADIUS_LG: number = 16;
   static readonly RADIUS_XL: number = 24;
 
-  // ==================== 间距 vp ====================
+  // ==================== 间距 vp（4 的倍数） ====================
   static readonly SPACE_XS: number = 4;
   static readonly SPACE_SM: number = 8;
   static readonly SPACE_MD: number = 12;
@@ -79,6 +84,40 @@ export class StyleConstants {
   static readonly SHADOW_FLOAT_RADIUS: number = 16;
   static readonly SHADOW_FLOAT_COLOR: string = '#1A000000';
   static readonly SHADOW_FLOAT_OFFSETY: number = 4;
+}
+
+/**
+ * 布局与控件尺寸常量（与主题无关的统一骨架规则）
+ *
+ * 所有页面/组件引用此处，禁止再写魔法数字。
+ */
+export class LayoutConstants {
+  /** 卡片圆角（12）+ 1px 描边 + 极浅阴影 */
+  static readonly CARD_RADIUS: number = StyleConstants.RADIUS_MD;
+  /** 卡片/输入框描边宽度 */
+  static readonly CARD_BORDER_WIDTH: number = 1;
+  /** 顶部标题栏高度（不含安全区） */
+  static readonly HEADER_HEIGHT: number = 56;
+  /** 顶部标题栏最小高度（含安全区时） */
+  static readonly HEADER_MIN_HEIGHT: number = 56;
+  /** 主按钮高度（通栏） */
+  static readonly BUTTON_HEIGHT_PRIMARY: number = 40;
+  /** 次按钮高度（描边） */
+  static readonly BUTTON_HEIGHT_SECONDARY: number = 36;
+  /** 小号操作按钮高度 */
+  static readonly BUTTON_HEIGHT_SMALL: number = 32;
+  /** 图标容器尺寸 */
+  static readonly ICON_BOX_SM: number = 32;
+  static readonly ICON_BOX_MD: number = 40;
+  static readonly ICON_BOX_LG: number = 48;
+  /** 设置项行高 */
+  static readonly ROW_HEIGHT_LIST_ITEM: number = 52;
+  /** 分割线宽度 */
+  static readonly HAIRLINE: number = 0.5;
+  /** 列表底部留白（避开 TabBar） */
+  static readonly BOTTOM_SAFE_SPACE: number = 80;
+  /** 内容最大宽度（无断点信息时的兜底） */
+  static readonly CONTENT_MAX_WIDTH: number = 960;
 }
 
 /** 传感器类型枚举 */

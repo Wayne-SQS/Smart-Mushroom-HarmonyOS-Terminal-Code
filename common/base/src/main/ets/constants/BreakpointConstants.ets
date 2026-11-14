@@ -150,7 +150,7 @@ export class AdaptiveUtils {
 
   /**
    * 根据断点获取设备列表列数
-   * xs/sm: 1列  md: 2列  lg: 3列  xl: 4列
+   * 统一五档断点：xs/sm: 1列  md: 2列  lg/xl: 3列
    */
   static getDeviceColumns(breakpoint: string): number {
     switch (breakpoint) {
@@ -158,24 +158,29 @@ export class AdaptiveUtils {
       case BreakpointConstants.SM: return 1;
       case BreakpointConstants.MD: return 2;
       case BreakpointConstants.LG: return 3;
-      case BreakpointConstants.XL: return 4;
+      case BreakpointConstants.XL: return 3;
       default: return 1;
     }
   }
 
   /**
-   * 根据断点获取配方/告警卡片列数
-   * xs: 1列  sm: 1列  md: 2列  lg: 2列  xl: 3列
+   * 根据断点获取配方/告警/菜单卡片列数
+   * 统一五档断点：xs/sm: 1列  md: 2列  lg/xl: 3列
    */
   static getCardColumns(breakpoint: string): number {
     switch (breakpoint) {
       case BreakpointConstants.XS: return 1;
       case BreakpointConstants.SM: return 1;
       case BreakpointConstants.MD: return 2;
-      case BreakpointConstants.LG: return 2;
+      case BreakpointConstants.LG: return 3;
       case BreakpointConstants.XL: return 3;
       default: return 1;
     }
+  }
+
+  /** 列表列数（设备/告警/配方/菜单通用，与 getCardColumns 一致） */
+  static getListColumns(breakpoint: string): number {
+    return AdaptiveUtils.getCardColumns(breakpoint);
   }
 
   /**

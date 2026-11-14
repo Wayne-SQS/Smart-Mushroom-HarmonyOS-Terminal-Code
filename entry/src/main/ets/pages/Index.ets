@@ -1,4 +1,4 @@
-import { BreakpointConstants, AdaptiveUtils } from 'common-base';
+import { BreakpointConstants, AdaptiveUtils, LayoutConstants } from 'common-base';
 import {
   DashboardPage,
   DevicePage,
@@ -36,7 +36,24 @@ struct Index {
   /** 监听主题切换，框架自动触发 build() 重绘 */
   @StorageLink('themeName') themeName: string = 'frosted';
   /** 登录态控制：未登录显示 LoginPage，登录后显示主界面 */
-  @StorageLink('isLoggedIn') isLoggedIn: boolean = false;
+  @StorageLink('isLoggedIn') @Watch('onAuthChanged') isLoggedIn: boolean = false;
+
+  /**
+   * 登录态变化统一处理
+   *
+   * 登出 / token 过期（401）都会把 isLoggedIn 置 false：
+   * 这里同时重置 Tab 与导航栈，避免下次登录后停留在需要鉴权的子页面。
+   */
+  private onAuthChanged(): void {
+    if (!this.isLoggedIn) {
+      this.currentIndex = 0;
+      try {
+        this.navPathStack.clear();
+      } catch (err) {
+        // 导航栈未初始化时忽略
+      }
+    }
+  }
 
   /** 一行获取当前主题 token（主题切换后 build() 重跑，自动取到新值） */
   t(): ThemeTokens {
@@ -168,7 +185,7 @@ struct Index {
       // 毛玻璃 TabBar：半透白底 + backdropBlur 模糊下层内容 + 顶边白线
       .backgroundColor(this.t().bgTabBar)
       .backdropBlur(this.t().blurAmount)
-      .border({ width: { top: 0.5 }, color: this.t().border })
+      .border({ width: { top: LayoutConstants.HAIRLINE }, color: this.t().border })
     }
     .mode(NavigationMode.Stack)
     .hideTitleBar(true)
@@ -299,7 +316,7 @@ struct Index {
     // 毛玻璃侧栏：半透底 + backdropBlur + 右边白线
     .backgroundColor(this.t().bgTabBar)
     .backdropBlur(this.t().blurAmount)
-    .border({ width: { right: 0.5 }, color: this.t().borderLight })
+    .border({ width: { right: LayoutConstants.HAIRLINE }, color: this.t().borderLight })
   }
 
   @Builder

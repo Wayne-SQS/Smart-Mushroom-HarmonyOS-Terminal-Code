@@ -1,8 +1,11 @@
-import { BreakpointConstants, AdaptiveUtils } from 'common-base';
+import { BreakpointConstants, AdaptiveUtils, LayoutConstants } from 'common-base';
 import { Recipe, DEFAULT_RECIPES } from '../model/RecipeModel';
 import { IotService } from '../service/IotService';
 import { ThemeManager } from '../theme/ThemeManager';
 import { ThemeTokens } from '../theme/ThemeTokens';
+import { PageHeader } from '../components/PageHeader';
+import { StateView } from '../components/StateView';
+import promptAction from '@ohos.promptAction';
 
 /**
  * 环境配方页面 - 主题驱动
@@ -21,6 +24,8 @@ export struct RecipePage {
   @State recipes: Recipe[] = [...DEFAULT_RECIPES];
   @State currentFilter: string = 'all';
   @State appliedRecipeId: string = '';
+  /** 正在应用的配方 ID（'' 表示空闲），用于禁用按钮防重复提交 */
+  @State applyingId: string = '';
   @State showAddForm: boolean = false;
   @State formMushroomType: string = '平菇';
   @State formGrowthStage: string = '菌丝期';
@@ -71,7 +76,19 @@ export struct RecipePage {
 
   @Builder
   ContentBody() {
-    this.HeaderSection()
+    PageHeader({
+      title: '环境配方',
+      subtitle: `${this.recipes.length} 个配方 · 已应用 ${this.appliedRecipeId.length > 0 ? 1 : 0}`,
+      actionLabel: this.showAddForm ? '返回' : '新建',
+      onAction: () => {
+        if (this.showAddForm) {
+          this.showAddForm = false;
+          this.resetForm();
+        } else {
+          this.showAddForm = true;
+        }
+      }
+    })
     this.FilterTabs()
     if (this.showAddForm) {
       this.AddForm()
@@ -102,50 +119,7 @@ export struct RecipePage {
     return Math.floor(12 / cols);
   }
 
-  // ==================== Header（暖棕色 accent 渐变） ====================
-  @Builder
-  HeaderSection() {
-    Stack({ alignContent: Alignment.TopStart }) {
-      Column()
-        .width('100%')
-        .height(140)
-        .linearGradient({
-          angle: 135,
-          colors: [[this.t().headerGradientTop, 0.0], [this.t().headerGradientBottom, 1.0]]
-        })
-
-      Row() {
-        Column() {
-          Text('环境配方')
-            .fontSize(AdaptiveUtils.getTitleFontSize(this.currentBreakpoint))
-            .fontColor(this.t().textWhite)
-            .fontWeight(FontWeight.Bold)
-          Text(`${this.recipes.length} 个配方 · 已应用 ${this.appliedRecipeId.length > 0 ? 1 : 0}`)
-            .fontSize(this.t().fontSm)
-            .fontColor(this.t().textWhiteSub)
-            .margin({ top: 4 })
-        }
-        .alignItems(HorizontalAlign.Start)
-        .layoutWeight(1)
-
-        Text(this.showAddForm ? '返回' : '+ 新建')
-          .fontSize(this.t().fontMd)
-          .fontColor(this.t().textWhite)
-          .padding({ left: 14, right: 14, top: 8, bottom: 8 })
-          .backgroundColor(this.t().bgCardLight)
-          .borderRadius(this.t().radiusSm)
-          .onClick(() => {
-            if (this.showAddForm) { this.showAddForm = false; this.resetForm(); }
-            else { this.showAddForm = true; }
-          })
-      }
-      .width('100%')
-      .height(140)
-      .padding({ left: this.getPagePadding(), right: this.getPagePadding() })
-    }
-    .width('100%')
-    .height(140)
-  }
+  // ==================== Header 已由 PageHeader 统一提供 ====================
 
   // ==================== 筛选 Tab ====================
   @Builder
@@ -176,20 +150,29 @@ export struct RecipePage {
   RecipeList() {
     Scroll() {
       Column() {
-        GridRow({
-          gutter: { x: this.getCardGap(), y: this.getCardGap() }
-        }) {
-          ForEach(this.getFilteredRecipes(), (item: Recipe) => {
-            GridCol({ span: this.getRecipeSpan() }) {
-              this.RecipeCard(item)
-            }
+        if (this.getFilteredRecipes().length === 0) {
+          StateView({
+            mode: 'empty',
+            title: '当前分类暂无配方',
+            message: '可点击右上角「新建」添加自定义配方',
+            verticalPadding: 40
           })
+        } else {
+          GridRow({
+            gutter: { x: this.getCardGap(), y: this.getCardGap() }
+          }) {
+            ForEach(this.getFilteredRecipes(), (item: Recipe) => {
+              GridCol({ span: this.getRecipeSpan() }) {
+                this.RecipeCard(item)
+              }
+            })
+          }
+          .width('100%')
         }
-        .width('100%')
         Blank().height(80)
       }
       .width('100%')
-      .padding({ left: this.getPagePadding(), right: this.getPagePadding(), top: 8 })
+      .padding({ left: this.getPagePadding(), right: this.getPagePadding(), top: LayoutConstants.SPACE_SM })
     }
     .layoutWeight(1)
     .scrollBar(BarState.Auto)
@@ -262,12 +245,14 @@ export struct RecipePage {
             .onClick(() => { this.deleteRecipe(item.id); })
         }
         Blank()
-        Text(this.appliedRecipeId === item.id ? '已应用 ✓' : '应用到设备')
+        Text(this.applyingId === item.id ? '应用中'
+          : (this.appliedRecipeId === item.id ? '已应用' : '应用到设备'))
           .fontSize(this.t().fontMd)
           .fontColor(this.appliedRecipeId === item.id ? this.t().textSub : this.t().textOnPrimary)
           .padding({ left: 16, right: 16, top: 8, bottom: 8 })
           .backgroundColor(this.appliedRecipeId === item.id ? this.t().bgCardLight : this.t().primary)
           .borderRadius(this.t().radiusSm)
+          .opacity(this.applyingId.length > 0 && this.applyingId !== item.id ? 0.5 : 1)
           .onClick(() => {
             if (this.appliedRecipeId !== item.id) { this.applyRecipe(item); }
           })
@@ -508,6 +493,11 @@ export struct RecipePage {
   }
 
   private async applyRecipe(recipe: Recipe): Promise<void> {
+    // 已有请求在途时忽略重复点击
+    if (this.applyingId.length > 0) {
+      return;
+    }
+    this.applyingId = recipe.id;
     try {
       const props: Record<string, Object> = {
         'temp_min': recipe.tempMin,
@@ -520,8 +510,13 @@ export struct RecipePage {
       };
       await IotService.getInstance().sendCommand('recipe_service', 'apply_recipe', props);
       this.appliedRecipeId = recipe.id;
-    } catch {
-      this.appliedRecipeId = recipe.id;
+      promptAction.showToast({ message: '配方已下发到设备', duration: 1800 });
+    } catch (err) {
+      // 下发失败必须如实反馈，不能把失败标成「已应用」
+      const msg = err instanceof Error ? err.message : String(err);
+      promptAction.showToast({ message: '配方应用失败：' + msg, duration: 2500 });
+    } finally {
+      this.applyingId = '';
     }
   }
 

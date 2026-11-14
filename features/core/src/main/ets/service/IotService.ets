@@ -167,6 +167,7 @@ export class IotService {
 
       if (response.responseCode !== 200) {
         Logger.error(TAG, '影子查询失败：HTTP ' + response.responseCode);
+        this.handleUnauthorized(response.responseCode);
         throw new Error('影子查询失败：HTTP ' + response.responseCode);
       }
 
@@ -297,6 +298,11 @@ export class IotService {
         response: response.result ? JSON.parse(response.result.toString()) : {},
         result_code: response.responseCode === 200 ? 0 : response.responseCode
       };
+      if (response.responseCode !== 200) {
+        this.handleUnauthorized(response.responseCode);
+        // 非 200 一律视为失败，不能把 HTTP 错误码当成功结果返回
+        throw new Error('命令下发失败：HTTP ' + response.responseCode);
+      }
       return result;
     } catch (err) {
       Logger.error(TAG, '[CMD] 下发异常: ' + String(err));
@@ -369,15 +375,14 @@ export class IotService {
   }
 
   /**
-   * 设备在线检测（通过影子是否可查判断）
+   * 查询设备是否在线（以影子是否存在服务判断）
+   *
+   * 注意：失败必须向上抛出，由 ViewModel 渲染错误态；
+   * 旧实现 catch 后 return false，会把「请求失败」伪装成「设备离线」。
    */
   async isDeviceOnline(): Promise<boolean> {
-    try {
-      const shadow = await this.queryDeviceShadow();
-      return shadow.shadow.length > 0;
-    } catch {
-      return false;
-    }
+    const shadow = await this.queryDeviceShadow();
+    return shadow.shadow.length > 0;
   }
 
   /**
@@ -395,6 +400,39 @@ export class IotService {
   }
 
   // ============================ 内部工具方法 ============================
+
+  /**
+   * 退出登录：清理 token 与登录态
+   *
+   * 与 401 过期走同一清理路径，保证两种退出方式结果一致。
+   */
+  logout(): void {
+    this.tokenManager.clearToken();
+    AppStorage.setOrCreate('isLoggedIn', false);
+    AppStorage.setOrCreate('authExpiredMsg', '');
+    Logger.info(TAG, '已退出登录并清理 token');
+  }
+
+  /**
+   * 统一处理鉴权失效（401）
+   *
+   * 一旦云平台返回 401：
+   * 1. 清空本地 token 缓存
+   * 2. 置登录态为 false（入口 Index 自动回落到 LoginPage）
+   * 3. 写入提示文案，由登录页展示
+   *
+   * 这样所有调用方（仪表盘/设备/控制）都能获得一致的过期体验，
+   * 不需要各自判断状态码。
+   */
+  private handleUnauthorized(responseCode: number): void {
+    if (responseCode !== 401) {
+      return;
+    }
+    this.tokenManager.clearToken();
+    AppStorage.setOrCreate('isLoggedIn', false);
+    AppStorage.setOrCreate('authExpiredMsg', '登录已过期，请重新登录');
+    Logger.warn(TAG, '收到 401，已清理 token 并退出登录态');
+  }
 
   /** 构造影子查询 URL */
   private buildShadowUrl(): string {
